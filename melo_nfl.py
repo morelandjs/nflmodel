@@ -6,7 +6,9 @@ import numpy as np
 from skopt import gp_minimize
 
 from melo import Melo
+import scipy
 
+import matplotlib.pyplot as plt
 
 # Pull NFL game data
 db = nfldb.connect()
@@ -37,13 +39,16 @@ def melo_wrapper(mode, k, bias, decay):
     )
 
 # calculate margin-dependent Elo ratings
-nfl_spreads = melo_wrapper('Fermi', .211, .171, .581)
-nfl_totals  = melo_wrapper('Bose', .121,  0.0, .656)
+nfl_spreads = melo_wrapper('Fermi', .245, .166, .597)
+nfl_totals  = melo_wrapper('Bose', .133,  0.01, .698)
 
 if __name__ == "__main__":
 
     # optimize point total and point spread
-    for mode in ('Fermi', 'Bose'):
+    for mode, bounds in [
+            ('Fermi', [(0.2, 0.3), (0.1, 0.2), (.5, .6)]),
+            ('Bose',  [(0.1, 0.2), (0.0, 0.01), (.6, .7)]),
+    ]:
 
         def obj(parameters):
             """
@@ -55,16 +60,13 @@ if __name__ == "__main__":
 
             melo = melo_wrapper(mode, k, bias, decay)
 
-            predictors = melo.predictors()
-            mean, value = [predictors[k] for k in ('mean', 'value')]
+            statistics = melo.statistics(smooth=5)
+            mean, value = [statistics[k] for k in ('mean', 'value')]
 
             residuals = (mean - value)[256:]
             return np.abs(residuals).mean()
 
-        # optimize model parameters
-        bounds = [(0.1, 0.3), (0.0, 0.3), (.5, .8)]
-
-        res_gp = gp_minimize(obj, bounds, n_calls=20)
+        res_gp = gp_minimize(obj, bounds, n_calls=100)
 
         # report diagnostics
         print("mode: {}".format(mode))
