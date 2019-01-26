@@ -5,5 +5,5 @@ setup(name='Melo NFL',
       description='NFL point spread and point total predictions.',
       author='J. Scott Moreland',
       author_email='morelandjs@gmail.com',
-      py_modules = ['melo_nfl']
+      py_modules = ['melo_team']
       )
