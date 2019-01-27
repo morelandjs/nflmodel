@@ -1,9 +1,11 @@
 #!/usr/bin/env python2.7
 
 from datetime import datetime, timedelta
+from pathlib import Path
+
 import nfldb
 import numpy as np
-from scipy.optimize import minimize
+from skopt import gp_minimize
 
 from melo import Melo
 
@@ -36,26 +38,65 @@ def melo_wrapper(mode, k, bias, decay, smooth, verbose=False):
         decay=lambda t: 1 if t < timedelta(weeks=20) else decay
     )
 
-nfl_spreads = melo_wrapper('Fermi', .257, .148, .627, 10)
-nfl_totals = melo_wrapper('Bose', .154,  0.15, .588, 10)
+
+def from_cache(mode, retrain=False, **kwargs):
+    """
+    Load the melo args from the cache if available, otherwise
+    train and cache a new instance.
+
+    """
+    cachefile = Path('cachedir', '{}.cache'.format(mode.lower()))
+
+    if not retrain and cachefile.exists():
+        args = np.loadtxt(cachefile)
+        return melo_wrapper(mode, *args)
+
+    def obj(args):
+        melo = melo_wrapper(mode, *args)
+        residuals = melo.residuals()
+        return np.abs(residuals).mean()
+
+    x0 = {
+        'Fermi': (0.20, 0.15, 0.60, 10.0),
+        'Bose': (0.20, 0.00, 0.60, 10.0),
+    }[mode]
+
+    bounds = {
+        'Fermi': [(0.1, 0.3), (0.1, 0.2), (0.55, 0.75), (0.0, 20.0)],
+        'Bose': [(0.1, 0.3), (-0.01, 0.01), (0.55, 0.75), (0.0, 20.0)],
+    }[mode]
+
+    res = gp_minimize(obj, bounds, x0=x0, n_calls=100, n_jobs=4, verbose=True)
+
+    print("mode: {}".format(mode))
+    print("best mean absolute error: {:.4f}".format(res.fun))
+    print("best parameters: {}".format(res.x))
+
+    if not cachefile.parent.exists():
+        cachefile.parent.mkdir()
+
+    np.savetxt(cachefile, res.x)
+    return melo_wrapper(mode, *res.x)
 
 
 if __name__ == "__main__":
+    import argparse
 
-    # optimize point total and point spread
-    for mode in ['Fermi', 'Bose']:
+    parser = argparse.ArgumentParser(
+        description='calibrate model parameters for point spreads and totals',
+        argument_default=argparse.SUPPRESS
+    )
 
-        def obj(args):
-            melo = melo_wrapper(mode, *args)
-            residuals = melo.residuals()
-            return np.abs(residuals).mean()
+    parser.add_argument(
+        '--retrain', action='store_true', default=False,
+        help='retrain even if model args are cached'
+    )
 
-        x0 = (.20, .15, .60, 7.0)
-        bounds = [(0.1, 0.3), (0.1, 0.2), (0.55, 0.75), (0.0, 20.0)]
-        res = minimize(obj, x0=x0, bounds=bounds, tol=1e-2)
+    args = parser.parse_args()
+    kwargs = vars(args)
 
-        # report diagnostics
-        print("mode: {}".format(mode))
-        print("best mean absolute error: {:.4f}".format(res.fun))
-        print("best parameters: {}".format(res.x))
-        print("last updated: {}".format(nfl_spreads.last_update))
+    for mode in 'Fermi', 'Bose':
+        from_cache(mode, **kwargs)
+else:
+    nfl_spreads = from_cache('Fermi')
+    nfl_totals = from_cache('Bose')
