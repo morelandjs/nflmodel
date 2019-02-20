@@ -12,8 +12,7 @@ from melo import Melo
 
 db = nfldb.connect()
 q = nfldb.Query(db)
-#q.game(season_type='Regular', finished=True)
-q.game(finished=True)
+q.game(season_type='Regular', finished=True)
 
 dates = [g.start_time for g in q.as_games()]
 labels1 = [g.home_team for g in q.as_games()]
@@ -28,8 +27,8 @@ def melo_wrapper(mode, k, bias, decay, smooth, verbose=False):
 
     """
     values, lines = {
-        'Fermi': (spreads, np.arange(-59.5, 60.5)),
-        'Bose': (totals, np.arange(-0.5, 105.5)),
+        'fermi': (spreads, np.arange(-59.5, 60.5)),
+        'bose': (totals, np.arange(-0.5, 105.5)),
     }[mode]
 
     return Melo(
@@ -53,20 +52,19 @@ def from_cache(mode, retrain=False, **kwargs):
 
     def obj(args):
         melo = melo_wrapper(mode, *args)
-        residuals = melo.residuals()
-        return np.abs(residuals).mean()
+        return melo.entropy()
 
     x0 = {
-        'Fermi': (0.20, 0.15, 0.60, 10.0),
-        'Bose': (0.20, 0.00, 0.60, 10.0),
+        'fermi': (0.20, 0.15, 0.60, 7.0),
+        'bose': (0.20, 0.00, 0.60, 7.0),
     }[mode]
 
     bounds = {
-        'Fermi': [(0.1, 0.3), (0.1, 0.2), (0.55, 0.75), (0.0, 20.0)],
-        'Bose': [(0.1, 0.3), (-0.01, 0.01), (0.55, 0.75), (0.0, 20.0)],
+        'fermi': [(0.1, 0.3), (0.1, 0.2), (0.55, 0.75), (0.0, 15.0)],
+        'bose': [(0.1, 0.3), (-0.01, 0.01), (0.55, 0.75), (0.0, 15.0)],
     }[mode]
 
-    res = gp_minimize(obj, bounds, x0=x0, n_calls=100, n_jobs=4, verbose=True)
+    res = gp_minimize(obj, bounds, n_calls=100, n_jobs=4, verbose=True)
 
     print("mode: {}".format(mode))
     print("best mean absolute error: {:.4f}".format(res.fun))
@@ -95,8 +93,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     kwargs = vars(args)
 
-    for mode in 'Fermi', 'Bose':
+    for mode in 'fermi', 'bose':
         from_cache(mode, **kwargs)
 else:
-    nfl_spreads = from_cache('Fermi')
-    nfl_totals = from_cache('Bose')
+    nfl_spreads = from_cache('fermi')
+    nfl_totals = from_cache('bose')
