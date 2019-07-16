@@ -1,112 +1,137 @@
 #!/usr/bin/env python2.7
 
+import operator
+from pathlib import Path
+import pickle
+
+from hyperopt import fmin, hp, tpe
 from melo import Melo
 import nfldb
 import numpy as np
 import pandas as pd
-from pyDOE import lhs
 
 
-# Load NFL game data
-db = nfldb.connect()
-query = nfldb.Query(db)
-query.game(season_type='Regular', finished=True)
-
-fields = ['start_time', 'home_team', 'home_score', 'away_team', 'away_score']
-
-games = pd.DataFrame([
-    tuple(getattr(g, f) for f in fields)
-    for g in sorted(query.as_games(), key=lambda g: g.start_time)
-], columns=fields)
-
-# Add columns to track rest days
-teams = np.union1d(games.home_team, games.away_team)
-time = {team: games.start_time.min() for team in teams}
-
-for index, game in games.iterrows():
-    home_rest, away_rest = [
-        (game.start_time - time[getattr(game, team)]).days
-        for team in ('home_team', 'away_team')
-    ]
-    for team in ('home_team', 'away_team'):
-        time[getattr(game, team)] = game.start_time
-
-    games.at[index, 'home_rest'] = home_rest if index > 16 else 7
-    games.at[index, 'away_rest'] = away_rest if index > 16 else 7
-
-
-def melo_wrapper(mode, kfactor, home_bias, decay_rate, fatigue):
+class MeloNFL(Melo):
     """
-    Melo class wrapper.
+    Generate NFL point-spread or point-total predictions
+    using the Margin-dependent Elo (MELO) model.
 
     """
-    if mode == 'spreads':
-        # comparison lines
-        lines = np.arange(-59.5, 60.5)
+    def __init__(self, mode, kfactor, home_advantage, decay_rate, fatigue):
 
-        # comparison bias factors
-        home_fatigue = fatigue * np.exp(-games.home_rest / 7.0)
-        away_fatigue = fatigue * np.exp(-games.away_rest / 7.0)
-        biases = home_bias - fatigue * (home_fatigue - away_fatigue)
+        # model operation mode: 'spread' or 'total'
+        if mode not in ['spread', 'total']:
+            raise ValueError(
+                "Unknown mode; valid options are 'spread' and 'total'")
 
-        # point spreads anti-commute
-        commutes = False
+        # mode-specific training hyperparameters
+        commutes, compare, lines = {
+            'total': (True, operator.add, np.arange(-0.5, 101.5)),
+            'spread': (False, operator.sub, np.arange(-59.5, 60.5)),
+        }[mode]
 
-        # pairwise comparison statistic
-        comparisons = games.home_score - games.away_score
-    elif mode == 'totals':
-        # comparison lines
-        lines = np.arange(-0.5, 101.5)
+        # nfl score data
+        db = nfldb.connect()
+        query = nfldb.Query(db)
+        query.game(season_type='Regular', finished=True)
+        games = self.dataframe(query)
 
-        # comparison bias factors
-        home_fatigue = fatigue * np.exp(-games.home_rest / 7.0)
-        away_fatigue = fatigue * np.exp(-games.away_rest / 7.0)
-        biases = home_bias - fatigue * (home_fatigue + away_fatigue)
+        # regress ratings to the mean as a function of elapsed time
+        def regress(years):
+            return 1 - np.exp(-years / max(decay_rate, 1e-12))
 
-        # point totals commute
-        commutes = True
+        # instantiate the Melo base class
+        Melo.__init__(self, kfactor, lines=lines, sigma=1.0, regress=regress,
+                      regress_unit='year', commutes=commutes)
 
-        # pairwise comparison statistic
-        comparisons = games.home_score + games.away_score
-    else:
-        raise ValueError('no such mode')
+        # determine bias factors from home field advantage and fatigue
+        home_fatigue = fatigue * np.exp(-games.home_rest / 7)
+        away_fatigue = fatigue * np.exp(-games.away_rest / 7)
+        compare_fatigue = compare(home_fatigue, away_fatigue)
+        biases = home_advantage - fatigue * compare_fatigue
 
-    def regress(years):
-        return 1 - np.exp(-years/(decay_rate + 1e-12))
+        # calibrate the model using the game data
+        self.fit(
+            games.start_time,
+            games.home_team,
+            games.away_team,
+            compare(games.home_score, games.away_score),
+            biases,
+        )
 
-    regress_unit = 'year'
+    def dataframe(self, query):
+        """
+        Returns pandas dataframe of NFL game scores.
 
-    model = Melo(kfactor, lines=lines, sigma=1.0, regress=regress,
-                 regress_unit=regress_unit, commutes=commutes)
+        """
+        fields = [
+            'start_time',
+            'home_team',
+            'home_score',
+            'away_team',
+            'away_score',
+        ]
 
-    model.fit(
-        games.start_time,
-        games.home_team,
-        games.away_team,
-        comparisons,
-        biases,
+        games = pd.DataFrame([
+            tuple(getattr(g, f) for f in fields)
+            for g in sorted(query.as_games(), key=lambda g: g.start_time)
+        ], columns=fields)
+
+        teams = np.union1d(games.home_team, games.away_team)
+        time = {team: games.start_time.min() for team in teams}
+
+        for index, game in games.iterrows():
+            home_rest, away_rest = [
+                (game.start_time - time[getattr(game, team)]).days
+                for team in ('home_team', 'away_team')
+            ]
+            for team in ('home_team', 'away_team'):
+                time[getattr(game, team)] = game.start_time
+
+            games.at[index, 'home_rest'] = home_rest if index > 16 else 7
+            games.at[index, 'away_rest'] = away_rest if index > 16 else 7
+
+        return games
+
+
+def calibrated_parameters(mode, evals=100, retrain=False):
+    """
+    Optimizes the MeloNFL model hyper parameters. Returns cached values
+    if retrain is False and the parameters are cached, otherwise it
+    optimizes the parameters and saves them to the cache.
+
+    """
+    cachedir = Path('/home/morelandjs/.local/share/melo_nfl')
+
+    if not cachedir.exists():
+        cachedir.mkdir()
+
+    cachefile = cachedir / '{}.pkl'.format(mode)
+
+    if not retrain and cachefile.exists():
+        return pickle.load(cachefile)
+
+    def objective(args):
+        return MeloNFL(mode, *args).loss
+
+    space = (
+        hp.uniform('kfactor', 0, 0.5),
+        hp.uniform('home_advantage', 0, 0.5),
+        hp.uniform('decay_rate', 0.0, 10.0),
+        hp.uniform('fatigue', 0, 1.0),
     )
 
-    return model
+    parameters = fmin(objective, space, algo=tpe.suggest, max_evals=200)
+
+    with cachefile.open(mode='wb') as f:
+        pickle.dump(parameters, f)
+
+    return parameters
 
 
-nfl_spreads = melo_wrapper('spreads', .166, .182, 3.48, 0.514)
-nfl_totals = melo_wrapper('totals', .130, 0.064, 0.775, 0.276)
+retrain = (True if __name__ == '__main__' else False)
 
-
-if __name__ == "__main__":
-
-    labels, limits = map(list, zip(*[
-        ('k',       (0.0,  0.5)),
-        ('bias',    (0.0,  0.5)),
-        ('decay',   (0.0,  1.0)),
-        ('fatigue', (0.0,  1.0)),
-    ]))
-
-    xmin, xmax = map(np.array, zip(*limits))
-    X = xmin + (xmax - xmin) * lhs(len(labels), samples=1000)
-    y = np.array([melo_wrapper('totals', *x).loss for x in X])
-
-    xopt = X[y.argsort()][:20].mean(axis=0)
-    for label, x in zip(labels, xopt):
-        print('{}: {}'.format(label, x))
+nfl_spreads, nfl_totals = [
+    MeloNFL(mode, **calibrated_parameters(mode, retrain=retrain))
+    for mode in ('spread', 'total')
+]
