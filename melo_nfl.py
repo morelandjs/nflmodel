@@ -17,7 +17,13 @@ class MeloNFL(Melo):
     using the Margin-dependent Elo (MELO) model.
 
     """
-    def __init__(self, mode, kfactor, home_advantage, decay_rate, fatigue):
+    def __init__(self, mode, kfactor, home_field, halflife, fatigue):
+
+        self.mode = mode
+        self.kfactor = kfactor
+        self.home_field = home_field
+        self.halflife = halflife
+        self.fatigue = fatigue
 
         # model operation mode: 'spread' or 'total'
         if mode not in ['spread', 'total']:
@@ -36,19 +42,19 @@ class MeloNFL(Melo):
         query.game(season_type='Regular', finished=True)
         games = self.dataframe(query)
 
-        # regress ratings to the mean as a function of elapsed time
+        # regress future ratings to the mean
         def regress(years):
-            return 1 - np.exp(-years / max(decay_rate, 1e-12))
+            with np.errstate(divide='ignore'):
+                return 1 - .5**np.divide(years, halflife)
 
         # instantiate the Melo base class
         Melo.__init__(self, kfactor, lines=lines, sigma=1.0, regress=regress,
                       regress_unit='year', commutes=commutes)
 
         # determine bias factors from home field advantage and fatigue
-        home_fatigue = fatigue * np.exp(-games.home_rest / 7)
-        away_fatigue = fatigue * np.exp(-games.away_rest / 7)
-        compare_fatigue = compare(home_fatigue, away_fatigue)
-        biases = home_advantage - fatigue * compare_fatigue
+        home_fatigue = fatigue * np.exp(-games.home_rest / 7.)
+        away_fatigue = fatigue * np.exp(-games.away_rest / 7.)
+        biases = home_field - compare(home_fatigue, away_fatigue)
 
         # calibrate the model using the game data
         self.fit(
@@ -93,6 +99,42 @@ class MeloNFL(Melo):
 
         return games
 
+    def probability(self, times, labels1, labels2, lines=0, neutral=False):
+        bias = self.home_field if neutral is False else 0
+        return super(MeloNFL, self).probability(
+            times, labels1, labels2, bias=bias, lines=lines
+        )
+
+    def percentile(self, times, labels1, labels2, p=50, neutral=False):
+        bias = self.home_field if neutral is False else 0
+        return super(MeloNFL, self).percentile(
+            times, labels1, labels2, bias=bias, p=p
+        )
+
+    def quantile(self, times, labels1, labels2, q=.5, neutral=False):
+        bias = self.home_field if neutral is False else 0
+        return super(MeloNFL, self).quantile(
+            times, labels1, labels2, bias=bias, q=q
+        )
+
+    def mean(self, times, labels1, labels2, neutral=False):
+        bias = self.home_field if neutral is False else 0
+        return super(MeloNFL, self).mean(
+            times, labels1, labels2, bias=bias
+        )
+
+    def median(self, times, labels1, labels2, neutral=False):
+        bias = self.home_field if neutral is False else 0
+        return super(MeloNFL, self).median(
+            times, labels1, labels2, bias=bias
+        )
+
+    def sample(self, times, labels1, labels2, size=100, neutral=False):
+        bias = self.home_field if neutral is False else 0
+        return super(MeloNFL, self).sample(
+            times, labels1, labels2, bias=bias, size=size
+        )
+
 
 def calibrated_parameters(mode, evals=100, retrain=False):
     """
@@ -109,19 +151,21 @@ def calibrated_parameters(mode, evals=100, retrain=False):
     cachefile = cachedir / '{}.pkl'.format(mode)
 
     if not retrain and cachefile.exists():
-        return pickle.load(cachefile)
+        return pickle.load(cachefile.open(mode='rb'))
 
     def objective(args):
         return MeloNFL(mode, *args).loss
 
     space = (
         hp.uniform('kfactor', 0, 0.5),
-        hp.uniform('home_advantage', 0, 0.5),
-        hp.uniform('decay_rate', 0.0, 10.0),
-        hp.uniform('fatigue', 0, 1.0),
+        hp.uniform('home_field', 0.0, 0.5),
+        hp.uniform('halflife', 0.0, 5.0),
+        hp.uniform('fatigue', 0, 0.5),
     )
 
     parameters = fmin(objective, space, algo=tpe.suggest, max_evals=200)
+
+    print(parameters)
 
     with cachefile.open(mode='wb') as f:
         pickle.dump(parameters, f)
