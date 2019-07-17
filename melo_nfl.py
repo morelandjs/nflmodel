@@ -8,7 +8,6 @@ from hyperopt import fmin, hp, tpe
 from melo import Melo
 import nfldb
 import numpy as np
-import pandas as pd
 
 
 class MeloNFL(Melo):
@@ -26,117 +25,163 @@ class MeloNFL(Melo):
         self.fatigue = fatigue
 
         # model operation mode: 'spread' or 'total'
-        if mode not in ['spread', 'total']:
+        if self.mode not in ['spread', 'total']:
             raise ValueError(
                 "Unknown mode; valid options are 'spread' and 'total'")
 
         # mode-specific training hyperparameters
-        commutes, compare, lines = {
+        self.commutes, self.compare, self.lines = {
             'total': (True, operator.add, np.arange(-0.5, 101.5)),
             'spread': (False, operator.sub, np.arange(-59.5, 60.5)),
         }[mode]
 
-        # nfl score data
+        # nfl game data
         db = nfldb.connect()
         query = nfldb.Query(db)
-        query.game(season_type='Regular', finished=True)
-        games = self.dataframe(query)
-
-        # regress future ratings to the mean
-        def regress(years):
-            with np.errstate(divide='ignore'):
-                return 1 - .5**np.divide(years, halflife)
+        query.game(season_type='Regular')
+        self.games = np.rec.array(
+            [g for g in self.gamedata(query)],
+            names=[
+                'start_time',
+                'home_team',
+                'away_team',
+                'home_score',
+                'away_score',
+                'home_bias',
+            ]
+        )
 
         # instantiate the Melo base class
-        Melo.__init__(self, kfactor, lines=lines, sigma=1.0, regress=regress,
-                      regress_unit='year', commutes=commutes)
+        Melo.__init__(self, self.kfactor, lines=self.lines, sigma=1.0,
+                      regress=self.regress, regress_unit='year',
+                      commutes=self.commutes)
 
-        # determine bias factors from home field advantage and fatigue
-        home_fatigue = fatigue * np.exp(-games.home_rest / 7.)
-        away_fatigue = fatigue * np.exp(-games.away_rest / 7.)
-        biases = home_field - compare(home_fatigue, away_fatigue)
+        # train on completed games only
+        self.completed_games = self.games[
+            (self.games.home_score > 0) | (self.games.away_score > 0)
+        ]
 
         # calibrate the model using the game data
         self.fit(
-            games.start_time,
-            games.home_team,
-            games.away_team,
-            compare(games.home_score, games.away_score),
-            biases,
+            self.completed_games.start_time,
+            self.completed_games.home_team,
+            self.completed_games.away_team,
+            self.compare(
+                self.completed_games.home_score,
+                self.completed_games.away_score,
+            ),
+            self.completed_games.home_bias
         )
 
-    def dataframe(self, query):
+    def gamedata(self, query):
         """
-        Returns pandas dataframe of NFL game scores.
+        Generator that yields a tuple of attributes for each game.
 
         """
-        fields = [
-            'start_time',
-            'home_team',
-            'home_score',
-            'away_team',
-            'away_score',
-        ]
+        start_time = {}
 
-        games = pd.DataFrame([
-            tuple(getattr(g, f) for f in fields)
-            for g in sorted(query.as_games(), key=lambda g: g.start_time)
-        ], columns=fields)
+        for g in sorted(query.as_games(), key=lambda g: g.start_time):
 
-        teams = np.union1d(games.home_team, games.away_team)
-        time = {team: games.start_time.min() for team in teams}
+            try:
+                home_rest = (g.start_time - start_time[g.home_team]).days
+                away_rest = (g.start_time - start_time[g.away_team]).days
+            except KeyError:
+                home_rest = 250
+                away_rest = 250
 
-        for index, game in games.iterrows():
-            home_rest, away_rest = [
-                (game.start_time - time[getattr(game, team)]).days
-                for team in ('home_team', 'away_team')
-            ]
-            for team in ('home_team', 'away_team'):
-                time[getattr(game, team)] = game.start_time
+            for team in [g.home_team, g.away_team]:
+                start_time[team] = g.start_time
 
-            games.at[index, 'home_rest'] = home_rest if index > 16 else 7
-            games.at[index, 'away_rest'] = away_rest if index > 16 else 7
+            yield (
+                g.start_time,
+                g.home_team,
+                g.away_team,
+                g.home_score,
+                g.away_score,
+                self.bias(home_rest, away_rest)
+            )
 
-        return games
+    def regress(self, years):
+        """
+        Regresses future ratings to the mean.
+
+        """
+        with np.errstate(divide='ignore'):
+            return 1 - .5**np.divide(years, self.halflife)
+
+    def bias(self, home_rest_days, away_rest_days):
+        """
+        Computes circumstantial bias factor given each team's rest.
+        Accounts for home field advantage and rest.
+
+        """
+        home_fatigue = self.fatigue * np.exp(-home_rest_days / 7.)
+        away_fatigue = self.fatigue * np.exp(-away_rest_days / 7.)
+
+        return self.home_field - self.compare(home_fatigue, away_fatigue)
 
     def probability(self, times, labels1, labels2, lines=0, bias=None):
+        """
+        Survival function probability distribution
+
+        """
         bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).probability(
             times, labels1, labels2, bias=bias, lines=lines
         )
 
     def percentile(self, times, labels1, labels2, p=50, bias=None):
+        """
+        Distribution percentiles
+
+        """
         bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).percentile(
             times, labels1, labels2, bias=bias, p=p
         )
 
     def quantile(self, times, labels1, labels2, q=.5, bias=None):
+        """
+        Distribution quantiles
+
+        """
         bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).quantile(
             times, labels1, labels2, bias=bias, q=q
         )
 
     def mean(self, times, labels1, labels2, bias=None):
+        """
+        Distribution mean
+
+        """
         bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).mean(
             times, labels1, labels2, bias=bias
         )
 
     def median(self, times, labels1, labels2, bias=None):
+        """
+        Distribution median
+
+        """
         bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).median(
             times, labels1, labels2, bias=bias
         )
 
     def sample(self, times, labels1, labels2, size=100, bias=None):
+        """
+        Sample the distribution
+
+        """
         bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).sample(
             times, labels1, labels2, bias=bias, size=size
         )
 
 
-def calibrated_parameters(mode, evals=100, retrain=False):
+def calibrated_parameters(mode, max_evals=200, retrain=False):
     """
     Optimizes the MeloNFL model hyper parameters. Returns cached values
     if retrain is False and the parameters are cached, otherwise it
@@ -160,10 +205,11 @@ def calibrated_parameters(mode, evals=100, retrain=False):
         hp.uniform('kfactor', 0, 0.5),
         hp.uniform('home_field', 0.0, 0.5),
         hp.uniform('halflife', 0.0, 5.0),
-        hp.uniform('fatigue', 0, 0.5),
+        hp.uniform('fatigue', 0, 1.0),
     )
 
-    parameters = fmin(objective, space, algo=tpe.suggest, max_evals=200)
+    parameters = fmin(objective, space, algo=tpe.suggest,
+                      max_evals=max_evals)
 
     print(parameters)
 
