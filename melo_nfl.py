@@ -99,38 +99,38 @@ class MeloNFL(Melo):
 
         return games
 
-    def probability(self, times, labels1, labels2, lines=0, neutral=False):
-        bias = self.home_field if neutral is False else 0
+    def probability(self, times, labels1, labels2, lines=0, bias=None):
+        bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).probability(
             times, labels1, labels2, bias=bias, lines=lines
         )
 
-    def percentile(self, times, labels1, labels2, p=50, neutral=False):
-        bias = self.home_field if neutral is False else 0
+    def percentile(self, times, labels1, labels2, p=50, bias=None):
+        bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).percentile(
             times, labels1, labels2, bias=bias, p=p
         )
 
-    def quantile(self, times, labels1, labels2, q=.5, neutral=False):
-        bias = self.home_field if neutral is False else 0
+    def quantile(self, times, labels1, labels2, q=.5, bias=None):
+        bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).quantile(
             times, labels1, labels2, bias=bias, q=q
         )
 
-    def mean(self, times, labels1, labels2, neutral=False):
-        bias = self.home_field if neutral is False else 0
+    def mean(self, times, labels1, labels2, bias=None):
+        bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).mean(
             times, labels1, labels2, bias=bias
         )
 
-    def median(self, times, labels1, labels2, neutral=False):
-        bias = self.home_field if neutral is False else 0
+    def median(self, times, labels1, labels2, bias=None):
+        bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).median(
             times, labels1, labels2, bias=bias
         )
 
-    def sample(self, times, labels1, labels2, size=100, neutral=False):
-        bias = self.home_field if neutral is False else 0
+    def sample(self, times, labels1, labels2, size=100, bias=None):
+        bias = self.home_field if bias is None else bias
         return super(MeloNFL, self).sample(
             times, labels1, labels2, bias=bias, size=size
         )
