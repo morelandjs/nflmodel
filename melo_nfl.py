@@ -4,7 +4,7 @@ import operator
 from pathlib import Path
 import pickle
 
-from hyperopt import fmin, hp, tpe
+from hyperopt import fmin, hp, tpe, STATUS_OK
 from melo import Melo
 import nfldb
 import numpy as np
@@ -36,11 +36,11 @@ class MeloNFL(Melo):
         }[mode]
 
         # nfl game data
-        db = nfldb.connect()
-        query = nfldb.Query(db)
-        query.game(season_type='Regular')
+        self.db = nfldb.connect()
+        self.query = nfldb.Query(self.db)
+        self.query.game(season_type='Regular')
         self.games = np.rec.array(
-            [g for g in self.gamedata(query)],
+            [g for g in self.gamedata(self.query)],
             names=[
                 'start_time',
                 'home_team',
@@ -52,9 +52,10 @@ class MeloNFL(Melo):
         )
 
         # instantiate the Melo base class
-        Melo.__init__(self, self.kfactor, lines=self.lines, sigma=1.0,
-                      regress=self.regress, regress_unit='year',
-                      commutes=self.commutes)
+        super(MeloNFL, self).__init__(
+            self.kfactor, lines=self.lines, sigma=1.0,
+            regress=self.regress, regress_unit='year',
+            commutes=self.commutes)
 
         # train on completed games only
         self.completed_games = self.games[
@@ -72,6 +73,10 @@ class MeloNFL(Melo):
             ),
             self.completed_games.home_bias
         )
+
+        burnin = 256
+        residuals = self.residuals()
+        self.loss = np.abs(residuals[burnin:]).mean()
 
     def gamedata(self, query):
         """
@@ -120,7 +125,7 @@ class MeloNFL(Melo):
 
         return self.home_field - self.compare(home_fatigue, away_fatigue)
 
-    def probability(self, times, labels1, labels2, lines=0, bias=None):
+    def probability(self, times, labels1, labels2, bias=None, lines=0):
         """
         Survival function probability distribution
 
@@ -130,7 +135,7 @@ class MeloNFL(Melo):
             times, labels1, labels2, bias=bias, lines=lines
         )
 
-    def percentile(self, times, labels1, labels2, p=50, bias=None):
+    def percentile(self, times, labels1, labels2, bias=None, p=50):
         """
         Distribution percentiles
 
@@ -140,7 +145,7 @@ class MeloNFL(Melo):
             times, labels1, labels2, bias=bias, p=p
         )
 
-    def quantile(self, times, labels1, labels2, q=.5, bias=None):
+    def quantile(self, times, labels1, labels2, bias=None, q=.5):
         """
         Distribution quantiles
 
@@ -170,7 +175,7 @@ class MeloNFL(Melo):
             times, labels1, labels2, bias=bias
         )
 
-    def sample(self, times, labels1, labels2, size=100, bias=None):
+    def sample(self, times, labels1, labels2, bias=None, size=100):
         """
         Sample the distribution
 
@@ -198,14 +203,15 @@ def calibrated_parameters(mode, max_evals=200, retrain=False):
     if not retrain and cachefile.exists():
         return pickle.load(cachefile.open(mode='rb'))
 
-    def objective(args):
-        return MeloNFL(mode, *args).loss
+    def objective(params):
+        loss = MeloNFL(mode, *params).loss
+        return {'loss': loss, 'params': params, 'status': STATUS_OK}
 
     space = (
-        hp.uniform('kfactor', 0, 0.5),
+        hp.uniform('kfactor', 0.0, 0.5),
         hp.uniform('home_field', 0.0, 0.5),
         hp.uniform('halflife', 0.0, 5.0),
-        hp.uniform('fatigue', 0, 1.0),
+        hp.uniform('fatigue', 0.0, 1.0),
     )
 
     parameters = fmin(objective, space, algo=tpe.suggest,
