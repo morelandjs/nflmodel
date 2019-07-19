@@ -1,10 +1,11 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python2
 
 import operator
 from pathlib import Path
 import pickle
 
-from hyperopt import fmin, hp, tpe, STATUS_OK
+from hyperopt import fmin, hp, tpe, Trials
+import matplotlib.pyplot as plt
 from melo import Melo
 import nfldb
 import numpy as np
@@ -74,6 +75,7 @@ class MeloNFL(Melo):
             self.completed_games.home_bias
         )
 
+        # compute mean absolute error for calibration
         burnin = 256
         residuals = self.residuals()
         self.loss = np.abs(residuals[burnin:]).mean()
@@ -86,7 +88,6 @@ class MeloNFL(Melo):
         start_time = {}
 
         for g in sorted(query.as_games(), key=lambda g: g.start_time):
-
             try:
                 home_rest = (g.start_time - start_time[g.home_team]).days
                 away_rest = (g.start_time - start_time[g.away_team]).days
@@ -193,7 +194,7 @@ def calibrated_parameters(mode, max_evals=200, retrain=False):
     optimizes the parameters and saves them to the cache.
 
     """
-    cachedir = Path('/home/morelandjs/.local/share/melo_nfl')
+    cachedir = Path('/home/morelandjs/.local/share/melo-nfl')
 
     if not cachedir.exists():
         cachedir.mkdir()
@@ -204,8 +205,7 @@ def calibrated_parameters(mode, max_evals=200, retrain=False):
         return pickle.load(cachefile.open(mode='rb'))
 
     def objective(params):
-        loss = MeloNFL(mode, *params).loss
-        return {'loss': loss, 'params': params, 'status': STATUS_OK}
+        return MeloNFL(mode, *params).loss
 
     space = (
         hp.uniform('kfactor', 0.0, 0.5),
@@ -214,10 +214,31 @@ def calibrated_parameters(mode, max_evals=200, retrain=False):
         hp.uniform('fatigue', 0.0, 1.0),
     )
 
-    parameters = fmin(objective, space, algo=tpe.suggest,
-                      max_evals=max_evals)
+    trials = Trials()
 
-    print(parameters)
+    parameters = fmin(objective, space, algo=tpe.suggest,
+                      max_evals=max_evals, trials=trials)
+
+    plotdir = cachedir / 'plots'
+    if not plotdir.exists():
+        plotdir.mkdir()
+
+    fig, axes = plt.subplots(
+        ncols=4, figsize=(12, 3), sharey=True)
+
+    losses = trials.losses()
+
+    for ax, (label, vals) in zip(axes.flat, trials.vals.items()):
+        c = plt.cm.coolwarm(np.linspace(0, 1, len(vals)))
+        ax.scatter(vals, losses, c=c)
+        ax.axvline(parameters[label], color='k')
+        ax.set_xlabel(label)
+        if ax.is_first_col():
+            ax.set_ylabel('Mean absolute error')
+
+    plotfile = plotdir / '{}_params.pdf'.format(mode)
+    plt.tight_layout()
+    plt.savefig(str(plotfile))
 
     with cachefile.open(mode='wb') as f:
         pickle.dump(parameters, f)
