@@ -1,14 +1,15 @@
-#!/usr/bin/env python2
-
+import logging
 import operator
-from pathlib import Path
 import pickle
+from sqlalchemy import create_engine
 
 from hyperopt import fmin, hp, tpe, Trials
 import matplotlib.pyplot as plt
 from melo import Melo
-import nfldb
 import numpy as np
+import pandas as pd
+
+from . import cachedir, dbfile
 
 
 class MeloNFL(Melo):
@@ -19,6 +20,7 @@ class MeloNFL(Melo):
     """
     def __init__(self, mode, kfactor, home_field, halflife, fatigue):
 
+        # hyperparameters
         self.mode = mode
         self.kfactor = kfactor
         self.home_field = home_field
@@ -36,21 +38,10 @@ class MeloNFL(Melo):
             'spread': (False, operator.sub, np.arange(-59.5, 60.5)),
         }[mode]
 
-        # nfl game data
-        self.db = nfldb.connect()
-        self.query = nfldb.Query(self.db)
-        self.query.game(season_type='Regular')
-        self.games = np.rec.array(
-            [g for g in self.gamedata(self.query)],
-            names=[
-                'start_time',
-                'home_team',
-                'away_team',
-                'home_score',
-                'away_score',
-                'home_bias',
-            ]
-        )
+        # connect to nfl stats database
+        engine = create_engine(r"sqlite:///{}".format(dbfile))
+        games_ = pd.read_sql_table('games', engine)
+        self.games = self.format_gamedata(games_)
 
         # instantiate the Melo base class
         super(MeloNFL, self).__init__(
@@ -58,21 +49,16 @@ class MeloNFL(Melo):
             regress=self.regress, regress_unit='year',
             commutes=self.commutes)
 
-        # train on completed games only
-        self.completed_games = self.games[
-            (self.games.home_score > 0) | (self.games.away_score > 0)
-        ]
-
         # calibrate the model using the game data
         self.fit(
-            self.completed_games.start_time,
-            self.completed_games.home_team,
-            self.completed_games.away_team,
+            self.games.date,
+            self.games.team_home,
+            self.games.team_away,
             self.compare(
-                self.completed_games.home_score,
-                self.completed_games.away_score,
+                self.games.score_home,
+                self.games.score_away,
             ),
-            self.completed_games.home_bias
+            self.games.home_bias
         )
 
         # compute mean absolute error for calibration
@@ -80,32 +66,60 @@ class MeloNFL(Melo):
         residuals = self.residuals()
         self.loss = np.abs(residuals[burnin:]).mean()
 
-    def gamedata(self, query):
+    def format_gamedata(self, games):
         """
         Generator that yields a tuple of attributes for each game.
 
         """
-        start_time = {}
+        # sort games by date
+        games.date = pd.to_datetime(games.date)
+        games.sort_values('date', inplace=True)
 
-        for g in sorted(query.as_games(), key=lambda g: g.start_time):
-            try:
-                home_rest = (g.start_time - start_time[g.home_team]).days
-                away_rest = (g.start_time - start_time[g.away_team]).days
-            except KeyError:
-                home_rest = 250
-                away_rest = 250
+        # give jacksonville jaguars a single name
+        games.replace('JAC', 'JAX', inplace=True)
 
-            for team in [g.home_team, g.away_team]:
-                start_time[team] = g.start_time
+        # give teams which haved moved cities their current name
+        games.replace('SD', 'LAC', inplace=True)
+        games.replace('STL', 'LA', inplace=True)
 
-            yield (
-                g.start_time,
-                g.home_team,
-                g.away_team,
-                g.home_score,
-                g.away_score,
-                self.bias(home_rest, away_rest)
+        # game dates for every team
+        game_dates = pd.concat([
+            games[['date', 'team_home']].rename(
+                columns={'team_home': 'team'}
+            ),
+            games[['date', 'team_away']].rename(
+                columns={'team_away': 'team'}
+            ),
+        ]).sort_values('date')
+
+        # calculate rest days
+        for team in ['home', 'away']:
+            games_prev = game_dates.rename(
+                columns={'team': 'team_{}'.format(team)}
             )
+            games_prev['date_{}_prev'.format(team)] = games.date
+
+            games = pd.merge_asof(
+                games, games_prev,
+                on='date', by='team_{}'.format(team),
+                allow_exact_matches=False
+            )
+
+        # add rest days columns
+        rested = pd.Timedelta('255 days')
+        games['home_rest'] = (games.date - games.date_home_prev).fillna(rested)
+        games['away_rest'] = (games.date - games.date_away_prev).fillna(rested)
+
+        # add bias factors
+        home_fatigue = self.fatigue * np.exp(-games.home_rest.dt.days / 7.)
+        away_fatigue = self.fatigue * np.exp(-games.away_rest.dt.days / 7.)
+        relative_fatigue = self.compare(home_fatigue, away_fatigue)
+        games['home_bias'] = self.home_field - relative_fatigue
+
+        # drop unwanted columns
+        games.drop(columns=['date_home_prev', 'date_away_prev'], inplace=True)
+
+        return games
 
     def regress(self, years):
         """
@@ -187,18 +201,13 @@ class MeloNFL(Melo):
         )
 
 
-def calibrated_parameters(mode, max_evals=200, retrain=False):
+def calibrated_parameters(mode, max_evals=10, retrain=False):
     """
     Optimizes the MeloNFL model hyper parameters. Returns cached values
     if retrain is False and the parameters are cached, otherwise it
     optimizes the parameters and saves them to the cache.
 
     """
-    cachedir = Path('/home/morelandjs/.local/share/melo-nfl')
-
-    if not cachedir.exists():
-        cachedir.mkdir()
-
     cachefile = cachedir / '{}.pkl'.format(mode)
 
     if not retrain and cachefile.exists():
@@ -216,12 +225,14 @@ def calibrated_parameters(mode, max_evals=200, retrain=False):
 
     trials = Trials()
 
+    logging.info(f'Optimizing {mode} hyperparameters')
+
     parameters = fmin(objective, space, algo=tpe.suggest,
-                      max_evals=max_evals, trials=trials)
+                      max_evals=max_evals, trials=trials,
+                      show_progressbar=False)
 
     plotdir = cachedir / 'plots'
-    if not plotdir.exists():
-        plotdir.mkdir()
+    plotdir.mkdir(exist_ok=True)
 
     fig, axes = plt.subplots(
         ncols=4, figsize=(12, 3), sharey=True)
@@ -246,9 +257,16 @@ def calibrated_parameters(mode, max_evals=200, retrain=False):
     return parameters
 
 
-retrain = (True if __name__ == '__main__' else False)
+def run():
+    nfl_spreads, nfl_totals = [
+        MeloNFL(mode, **calibrated_parameters(mode, retrain=True))
+        for mode in ('spread', 'total')
+    ]
 
-nfl_spreads, nfl_totals = [
-    MeloNFL(mode, **calibrated_parameters(mode, retrain=retrain))
-    for mode in ('spread', 'total')
-]
+if __name__ == '__main__':
+    run()
+else:
+    nfl_spreads, nfl_totals = [
+        MeloNFL(mode, **calibrated_parameters(mode, retrain=False))
+        for mode in ('spread', 'total')
+    ]

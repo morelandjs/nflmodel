@@ -1,9 +1,14 @@
 from setuptools import setup
 
-setup(name='MELO NFL',
+setup(name='nflmodel',
       version='0.1',
       description='NFL point spread and point total predictions.',
       author='J. Scott Moreland',
       author_email='morelandjs@gmail.com',
-      py_modules = ['melo_nfl']
+      packages=['nflmodel'],
+      scripts=[
+          'scripts/nflmodel-update-data',
+          'scripts/nflmodel-train-model',
+          'scripts/nflmodel-validate',
+      ]
       )
