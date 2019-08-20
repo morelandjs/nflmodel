@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
 
-from .model import nfl_spreads
+from .model import nfl_spreads, nfl_totals
 
 
 def run():

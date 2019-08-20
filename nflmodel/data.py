@@ -1,12 +1,11 @@
 """Download NFL game data and store in a SQL database"""
 
-from datetime import datetime
 import logging
 import sqlite3
 
 import nflgame
 
-from . import dbfile
+from . import dbfile, now
 
 
 def initialize_database(conn):
@@ -30,21 +29,18 @@ def initialize_database(conn):
     conn.commit()
 
 
-def update_database(conn):
+def update_database(conn, refresh=False):
     """
     Save games to the SQL database.
 
     """
-    now = datetime.now()
-
     c = conn.cursor()
     c.execute("SELECT season FROM games ORDER BY date DESC LIMIT 1")
-    latest_saved_season = c.fetchone()
+    last_update = c.fetchone()
 
     start_season = (
-        2009
-        if latest_saved_season is None else
-        latest_saved_season[0]
+        2009 if (last_update is None) or
+        (refresh is True) else last_update[0]
     )
 
     end_season = now.year
@@ -81,16 +77,12 @@ def update_database(conn):
     conn.commit()
 
 
-def run():
+def run(refresh=False):
     """
     Establish connection, then initialize and update database
 
     """
     conn = sqlite3.connect(str(dbfile))
     initialize_database(conn)
-    update_database(conn)
+    update_database(conn, refresh=refresh)
     conn.close()
-
-
-if __name__ == '__main__':
-    run()

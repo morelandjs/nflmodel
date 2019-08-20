@@ -1,5 +1,6 @@
 """Project initialization and common objects"""
 
+from datetime import datetime
 import logging
 import os
 from pathlib import Path
@@ -11,6 +12,8 @@ logging.basicConfig(
     format='[%(levelname)s][%(module)s] %(message)s',
     level=os.getenv('LOGLEVEL', 'info').upper()
 )
+
+now = datetime.now()
 
 home = Path.home()
 workdir = Path.cwd()

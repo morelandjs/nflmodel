@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+
+import argparse
+from datetime import datetime
+
+
+now = datetime.now()
+
+parser = argparse.ArgumentParser(
+    description='NFL ratings and predictions'
+)
+
+subparsers = parser.add_subparsers(
+    dest='subparser',
+    help='base functionality',
+)
+
+update_p = subparsers.add_parser('update')
+
+update_p.add_argument(
+    '--refresh',
+    action='store_true',
+    help='wipe and rebuild the sql database',
+)
+
+train_p = subparsers.add_parser('train')
+
+train_p.add_argument(
+    '--steps',
+    default=200,
+    type=int,
+    help='number of training steps',
+)
+
+args = parser.parse_args()
+kwargs = vars(args)
+subparser = kwargs.pop('subparser')
+
+if subparser == 'update':
+    import nflmodel.data
+    nflmodel.data.run(**kwargs)
+elif subparser == 'train':
+    import nflmodel.model
+    nflmodel.model.run('spread', retrain=True, **kwargs)
+    nflmodel.model.run('total', retrain=True, **kwargs)

@@ -1,3 +1,5 @@
+"""Trains model and exposes predictor class objects"""
+
 import logging
 import operator
 import pickle
@@ -201,7 +203,7 @@ class MeloNFL(Melo):
         )
 
 
-def calibrated_parameters(mode, max_evals=10, retrain=False):
+def calibrated_parameters(mode, steps=200, retrain=False):
     """
     Optimizes the MeloNFL model hyper parameters. Returns cached values
     if retrain is False and the parameters are cached, otherwise it
@@ -228,7 +230,7 @@ def calibrated_parameters(mode, max_evals=10, retrain=False):
     logging.info(f'Optimizing {mode} hyperparameters')
 
     parameters = fmin(objective, space, algo=tpe.suggest,
-                      max_evals=max_evals, trials=trials,
+                      max_evals=steps, trials=trials,
                       show_progressbar=False)
 
     plotdir = cachedir / 'plots'
@@ -257,16 +259,17 @@ def calibrated_parameters(mode, max_evals=10, retrain=False):
     return parameters
 
 
-def run():
-    nfl_spreads, nfl_totals = [
-        MeloNFL(mode, **calibrated_parameters(mode, retrain=True))
-        for mode in ('spread', 'total')
-    ]
+def run(mode, steps=200, retrain=False):
+    """
+    Runs point spread (or point total) model and recalibrates the
+    model hyperparameters if necessary. Returns the calibrated model
+    instance.
 
-if __name__ == '__main__':
-    run()
-else:
-    nfl_spreads, nfl_totals = [
-        MeloNFL(mode, **calibrated_parameters(mode, retrain=False))
-        for mode in ('spread', 'total')
-    ]
+    """
+    params = calibrated_parameters(mode, steps=steps, retrain=retrain)
+
+    return MeloNFL(mode, **params)
+
+
+nfl_spreads = run('spread')
+nfl_totals = run('total')
