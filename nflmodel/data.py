@@ -48,6 +48,8 @@ def update_database(conn, refresh=False):
     end_season = now.year
 
     # loop over nfl season years 2009-present
+    logging.info("updating NFL database")
+
     for season in range(start_season, end_season + 1):
 
         # print progress to stdout
@@ -79,22 +81,19 @@ def update_database(conn, refresh=False):
     conn.commit()
 
 
-def run(refresh=False):
+def load_games(refresh=False):
     """
     Establish connection, then initialize and update database
 
     """
-    logging.info("updating NFL database")
+    engine = create_engine(r"sqlite:///{}".format(dbfile))
+
+    if not refresh and dbfile.exists():
+        return pd.read_sql_table('games', engine)
+
     conn = sqlite3.connect(str(dbfile))
     initialize_database(conn)
-    update_database(conn, refresh)
+    update_database(conn, refresh=refresh)
     conn.close()
 
-
-try:
-    engine = create_engine(r"sqlite:///{}".format(dbfile))
-    games = pd.read_sql_table('games', engine)
-except ValueError:
-    run(refresh=True)
-    engine = create_engine(r"sqlite:///{}".format(dbfile))
-    games = pd.read_sql_table('games', engine)
+    return pd.read_sql_table('games', engine)

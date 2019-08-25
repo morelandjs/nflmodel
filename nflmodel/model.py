@@ -11,7 +11,7 @@ from melo import Melo
 import numpy as np
 import pandas as pd
 
-from .data import games
+from .data import load_games
 from . import cachedir
 
 
@@ -42,7 +42,8 @@ class MeloNFL(Melo):
         }[mode]
 
         # connect to nfl stats database
-        self.games = self.format_gamedata(games)
+        games_ = load_games(refresh=False)
+        self.games = self.format_gamedata(games_)
 
         # instantiate the Melo base class
         super(MeloNFL, self).__init__(

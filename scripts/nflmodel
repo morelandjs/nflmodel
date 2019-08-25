@@ -7,6 +7,7 @@ import os
 import sys
 
 from nflmodel import data, model
+import pandas as pd
 
 
 logging.basicConfig(
@@ -26,7 +27,7 @@ subparsers = parser.add_subparsers(
     help='base functionality',
 )
 
-# update model parameters
+# update parameters
 update_p = subparsers.add_parser('update')
 
 update_p.add_argument(
@@ -36,7 +37,7 @@ update_p.add_argument(
     help='wipe and rebuild the sql database',
 )
 
-# training model parameters
+# training parameters
 train_p = subparsers.add_parser('train')
 
 train_p.add_argument(
@@ -46,7 +47,7 @@ train_p.add_argument(
     help='number of training steps',
 )
 
-# prediction model parameters
+# prediction parameters
 predict = subparsers.add_parser('predict')
 
 predict.add_argument(
@@ -67,35 +68,44 @@ predict.add_argument(
     help='away team',
 )
 
+# ranking parameters
+rank = subparsers.add_parser('rank')
+
 args = parser.parse_args()
 kwargs = vars(args)
 subparser = kwargs.pop('subparser')
 
 if subparser == 'update':
     refresh = kwargs['refresh']
-    data.run(refresh=refresh)
+    data.load_games(refresh=refresh)
 
 elif subparser == 'train':
     steps = kwargs['steps']
     for mode in ['spread', 'total']:
-        model.MeloNFL.from_cache(
-            mode, steps=steps, retrain=True)
+        model.MeloNFL.from_cache(mode, steps=steps, retrain=True)
 
 elif subparser == 'predict':
     for mode in ['spread', 'total']:
-        predict = model.MeloNFL.from_cache(
-            mode, retrain=False)
+        melo_nfl = model.MeloNFL.from_cache(mode, retrain=False)
 
         date, home, away = [
             kwargs[k] for k in ['date', 'home', 'away']]
 
-        mean = predict.mean(date, home, away)
-        median = predict.median(date, home, away)
+        mean = melo_nfl.mean(date, home, away)
+        median = melo_nfl.median(date, home, away)
 
         msg = "{}: mean = {:.1f}, median = {:.1f}".format(
             mode.upper(), mean, median)
 
         logging.info(msg)
+
+elif subparser == 'rank':
+    for mode in ['spread', 'total']:
+        melo_nfl = model.MeloNFL.from_cache(mode, retrain=False)
+        df = pd.DataFrame(melo_nfl.rank(now), columns=['team', f'mean {mode}'])
+        df.index += 1
+
+        print(df.round(decimals=1), '\n')
 
 else:
     raise ValueError("No such argument {}".format(subparser))
