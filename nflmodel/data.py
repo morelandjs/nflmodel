@@ -4,6 +4,8 @@ import logging
 import sqlite3
 
 import nflgame
+import pandas as pd
+from sqlalchemy import create_engine
 
 from . import dbfile, now
 
@@ -49,7 +51,7 @@ def update_database(conn, refresh=False):
     for season in range(start_season, end_season + 1):
 
         # print progress to stdout
-        logging.info(f'Updating Season {season}')
+        logging.info(f'season {season}')
 
         # loop over games in season and week
         for g in nflgame.games_gen(season, kind='REG'):
@@ -82,7 +84,17 @@ def run(refresh=False):
     Establish connection, then initialize and update database
 
     """
+    logging.info("updating NFL database")
     conn = sqlite3.connect(str(dbfile))
     initialize_database(conn)
-    update_database(conn, refresh=refresh)
+    update_database(conn, refresh)
     conn.close()
+
+
+try:
+    engine = create_engine(r"sqlite:///{}".format(dbfile))
+    games = pd.read_sql_table('games', engine)
+except ValueError:
+    run(refresh=True)
+    engine = create_engine(r"sqlite:///{}".format(dbfile))
+    games = pd.read_sql_table('games', engine)

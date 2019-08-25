@@ -1,9 +1,9 @@
-NFL Model (under construction)
-==============================
+NFL Model
+=========
 
 *NFL ratings and predictions*
 
-This module trains the margin-dependent Elo (melo) model on NFL game data. It creates two trained melo class objects, nfl_spreads and nfl_totals, which may be used to predict NFL point spreads and point totals. It also provides an interface to optimize the hyperparameters of the model.
+This module trains the margin-dependent Elo (melo) model on NFL game data.
 
 Installation
 ------------
@@ -17,16 +17,14 @@ Quick Start
 -----------
 First, populate the database
 ```
-nflmodel update --refresh
+nflmodel update
 ```
 Then train the model on the dataset
 ```
 nflmodel train --steps 200
 ```
-Finally, import the trained model as a Python package to generate predictions
+Finally, compute point spread and point total predictions
 ```
-from nflmodel.model import nfl_spreads
-from datetime import datetime
-
-ranked_teams = nfl_spreads.rank(datetime.today(), statistic='median')
+nflmodel predict 2018-12-30 TB LAR
+nflmodel predict 2019-09-05 CLE TEN
 ```

@@ -2,7 +2,18 @@
 
 import argparse
 from datetime import datetime
+import logging
+import os
+import sys
 
+from nflmodel import data, model
+
+
+logging.basicConfig(
+    stream=sys.stdout,
+    format='[%(levelname)s][%(module)s] %(message)s',
+    level=os.getenv('LOGLEVEL', 'info').upper()
+)
 
 now = datetime.now()
 
@@ -15,14 +26,17 @@ subparsers = parser.add_subparsers(
     help='base functionality',
 )
 
+# update model parameters
 update_p = subparsers.add_parser('update')
 
 update_p.add_argument(
     '--refresh',
+    default=False,
     action='store_true',
     help='wipe and rebuild the sql database',
 )
 
+# training model parameters
 train_p = subparsers.add_parser('train')
 
 train_p.add_argument(
@@ -32,14 +46,56 @@ train_p.add_argument(
     help='number of training steps',
 )
 
+# prediction model parameters
+predict = subparsers.add_parser('predict')
+
+predict.add_argument(
+    'date',
+    type=str,
+    help='game date',
+)
+
+predict.add_argument(
+    'home',
+    type=str,
+    help='home team',
+)
+
+predict.add_argument(
+    'away',
+    type=str,
+    help='away team',
+)
+
 args = parser.parse_args()
 kwargs = vars(args)
 subparser = kwargs.pop('subparser')
 
 if subparser == 'update':
-    import nflmodel.data
-    nflmodel.data.run(**kwargs)
+    refresh = kwargs['refresh']
+    data.run(refresh=refresh)
+
 elif subparser == 'train':
-    import nflmodel.model
-    nflmodel.model.run('spread', retrain=True, **kwargs)
-    nflmodel.model.run('total', retrain=True, **kwargs)
+    steps = kwargs['steps']
+    for mode in ['spread', 'total']:
+        model.MeloNFL.from_cache(
+            mode, steps=steps, retrain=True)
+
+elif subparser == 'predict':
+    for mode in ['spread', 'total']:
+        predict = model.MeloNFL.from_cache(
+            mode, retrain=False)
+
+        date, home, away = [
+            kwargs[k] for k in ['date', 'home', 'away']]
+
+        mean = predict.mean(date, home, away)
+        median = predict.median(date, home, away)
+
+        msg = "{}: mean = {:.1f}, median = {:.1f}".format(
+            mode.upper(), mean, median)
+
+        logging.info(msg)
+
+else:
+    raise ValueError("No such argument {}".format(subparser))

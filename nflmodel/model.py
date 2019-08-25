@@ -3,15 +3,16 @@
 import logging
 import operator
 import pickle
-from sqlalchemy import create_engine
 
 from hyperopt import fmin, hp, tpe, Trials
+from joblib import dump, load
 import matplotlib.pyplot as plt
 from melo import Melo
 import numpy as np
 import pandas as pd
 
-from . import cachedir, dbfile
+from .data import games
+from . import cachedir
 
 
 class MeloNFL(Melo):
@@ -41,9 +42,7 @@ class MeloNFL(Melo):
         }[mode]
 
         # connect to nfl stats database
-        engine = create_engine(r"sqlite:///{}".format(dbfile))
-        games_ = pd.read_sql_table('games', engine)
-        self.games = self.format_gamedata(games_)
+        self.games = self.format_gamedata(games)
 
         # instantiate the Melo base class
         super(MeloNFL, self).__init__(
@@ -202,74 +201,64 @@ class MeloNFL(Melo):
             times, labels1, labels2, bias=bias, size=size
         )
 
+    @classmethod
+    def from_cache(cls, mode, steps=200, retrain=False):
+        """
+        Optimizes the MeloNFL model hyper parameters. Returns cached values
+        if retrain is False and the parameters are cached, otherwise it
+        optimizes the parameters and saves them to the cache.
 
-def calibrated_parameters(mode, steps=200, retrain=False):
-    """
-    Optimizes the MeloNFL model hyper parameters. Returns cached values
-    if retrain is False and the parameters are cached, otherwise it
-    optimizes the parameters and saves them to the cache.
+        """
+        cachefile = cachedir / '{}.pkl'.format(mode)
 
-    """
-    cachefile = cachedir / '{}.pkl'.format(mode)
+        if not retrain and cachefile.exists():
+            logging.debug('loading {} model from cache', mode)
+            model = load(cachefile)
+            return model
 
-    if not retrain and cachefile.exists():
-        return pickle.load(cachefile.open(mode='rb'))
+        def objective(params):
+            return cls(mode, *params).loss
 
-    def objective(params):
-        return MeloNFL(mode, *params).loss
+        space = (
+            hp.uniform('kfactor', 0.0, 0.5),
+            hp.uniform('home_field', 0.0, 0.5),
+            hp.uniform('halflife', 0.0, 5.0),
+            hp.uniform('fatigue', 0.0, 1.0),
+        )
 
-    space = (
-        hp.uniform('kfactor', 0.0, 0.5),
-        hp.uniform('home_field', 0.0, 0.5),
-        hp.uniform('halflife', 0.0, 5.0),
-        hp.uniform('fatigue', 0.0, 1.0),
-    )
+        trials = Trials()
 
-    trials = Trials()
+        logging.info(f'optimizing {mode} hyperparameters')
 
-    logging.info(f'Optimizing {mode} hyperparameters')
+        parameters = fmin(objective, space, algo=tpe.suggest,
+                          max_evals=steps, trials=trials,
+                          show_progressbar=False)
 
-    parameters = fmin(objective, space, algo=tpe.suggest,
-                      max_evals=steps, trials=trials,
-                      show_progressbar=False)
+        plotdir = cachedir / 'plots'
+        plotdir.mkdir(exist_ok=True)
 
-    plotdir = cachedir / 'plots'
-    plotdir.mkdir(exist_ok=True)
+        fig, axes = plt.subplots(
+            ncols=4, figsize=(12, 3), sharey=True)
 
-    fig, axes = plt.subplots(
-        ncols=4, figsize=(12, 3), sharey=True)
+        losses = trials.losses()
 
-    losses = trials.losses()
+        for ax, (label, vals) in zip(axes.flat, trials.vals.items()):
+            c = plt.cm.coolwarm(np.linspace(0, 1, len(vals)))
+            ax.scatter(vals, losses, c=c)
+            ax.axvline(parameters[label], color='k')
+            ax.set_xlabel(label)
+            if ax.is_first_col():
+                ax.set_ylabel('Mean absolute error')
 
-    for ax, (label, vals) in zip(axes.flat, trials.vals.items()):
-        c = plt.cm.coolwarm(np.linspace(0, 1, len(vals)))
-        ax.scatter(vals, losses, c=c)
-        ax.axvline(parameters[label], color='k')
-        ax.set_xlabel(label)
-        if ax.is_first_col():
-            ax.set_ylabel('Mean absolute error')
+        plotfile = plotdir / '{}_params.pdf'.format(mode)
+        plt.tight_layout()
+        plt.savefig(str(plotfile))
 
-    plotfile = plotdir / '{}_params.pdf'.format(mode)
-    plt.tight_layout()
-    plt.savefig(str(plotfile))
+        model = cls(mode, **parameters)
 
-    with cachefile.open(mode='wb') as f:
-        pickle.dump(parameters, f)
+        logging.info('writing cache file %s', cachefile)
 
-    return parameters
+        cachefile.parent.mkdir(exist_ok=True)
+        dump(model, cachefile, protocol=pickle.HIGHEST_PROTOCOL)
 
-
-def run(mode, steps=200, retrain=False):
-    """
-    Runs point spread (or point total) model and recalibrates the
-    model hyperparameters if necessary. Returns the calibrated model
-    instance.
-
-    """
-    params = calibrated_parameters(mode, steps=steps, retrain=retrain)
-
-    return MeloNFL(mode, **params)
-
-
-nfl_spreads = run('spread')
-nfl_totals = run('total')
+        return model
