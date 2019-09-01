@@ -134,7 +134,7 @@ class MeloNFL(Melo):
         return -self.compare(home_fatigue, away_fatigue)
 
     @classmethod
-    def from_cache(cls, mode, steps=200, retrain=False):
+    def from_cache(cls, mode, steps=100, retrain=False):
         """
         Optimizes the MeloNFL model hyper parameters. Returns cached values
         if retrain is False and the parameters are cached, otherwise it

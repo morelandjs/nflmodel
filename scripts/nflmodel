@@ -43,7 +43,7 @@ train_p = subparsers.add_parser('train')
 
 train_p.add_argument(
     '--steps',
-    default=200,
+    default=100,
     type=int,
     help='number of training steps',
 )

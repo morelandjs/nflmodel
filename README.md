@@ -21,7 +21,7 @@ nflmodel update
 ```
 Then train the model on the dataset
 ```
-nflmodel train --steps 200
+nflmodel train --steps 100
 ```
 Finally, compute point spread and point total predictions
 ```
@@ -32,3 +32,8 @@ The model also ranks teams by their mean expected point spread (and point total)
 ```
 nflmodel rank
 ```
+Additionally, you can validate the model predictions by calling
+```
+nflmodel validate
+```
+which generates two figures, `validate_spread.pdf` and `validate_total.pdf`, visualizing the distribution of prediction residuals and quantiles.
