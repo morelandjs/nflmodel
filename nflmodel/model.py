@@ -154,7 +154,7 @@ class MeloNFL(Melo):
         space = (
             hp.uniform('kfactor', 0.0, 0.5),
             hp.uniform('regress', 0.0, 1.0),
-            hp.uniform('fatigue', 0.0, 1.0),
+            hp.uniform('fatigue', -2.0, 2.0),
         )
 
         trials = Trials()
