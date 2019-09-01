@@ -1,18 +1,27 @@
 """Graphically validate model predictions."""
 
+import logging
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
 
-from .model import nfl_spreads, nfl_totals
+from . import model
 
 
-def run():
+def assess_predictions(mode):
+    """
+    Plot several statistical tests of the model prediction accuracy.
+
+    """
     # figure style and layout
     width, height = plt.rcParams['figure.figsize']
     fig, (axl, axr) = plt.subplots(
         ncols=2, figsize=(2*width, height)
     )
+
+    # load nfl spread predictions
+    nfl_model = model.MeloNFL.from_cache(mode, retrain=False)
 
     # standard normal distribution
     x = np.linspace(-4, 4, 1000)
@@ -20,12 +29,14 @@ def run():
     axl.plot(x, y, color='black')
 
     # raw residuals
-    residuals = nfl_spreads.residuals()[256:]
-    print('mean: {:.2f}'.format(residuals.mean()))
-    print('mean absolute error: {:.2f}'.format(np.abs(residuals).mean()))
+    residuals = nfl_model.residuals()[256:]
+    logging.info('{} residual mean: {:.2f}'
+                 .format(mode, residuals.mean()))
+    logging.info('{} residual mean absolute error: {:.2f}'
+                 .format(mode, np.abs(residuals).mean()))
 
     # standardized residuals
-    residuals = nfl_spreads.residuals(standardize=True)[256:]
+    residuals = nfl_model.residuals(standardize=True)[256:]
     axl.hist(residuals, bins=40, histtype='step', density=True)
 
     # residual figure attributes
@@ -35,7 +46,7 @@ def run():
     axl.set_title('Standardized residuals')
 
     # quantiles
-    quantiles = nfl_spreads.quantiles()[256:]
+    quantiles = nfl_model.quantiles()[256:]
     axr.axhline(1, color='black')
     axr.hist(quantiles, bins=20, histtype='step', density=True)
 
@@ -47,8 +58,4 @@ def run():
     axr.set_title('Quantiles')
 
     plt.tight_layout()
-    plt.savefig('validate.pdf')
-
-
-if __name__ == '__main__':
-    run()
+    plt.savefig('validate_{}.pdf'.format(mode))

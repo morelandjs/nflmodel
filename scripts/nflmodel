@@ -6,8 +6,9 @@ import logging
 import os
 import sys
 
-from nflmodel import data, model
 import pandas as pd
+
+from nflmodel import data, model, validate
 
 
 logging.basicConfig(
@@ -48,33 +49,38 @@ train_p.add_argument(
 )
 
 # prediction parameters
-predict = subparsers.add_parser('predict')
+predict_p = subparsers.add_parser('predict')
 
-predict.add_argument(
+predict_p.add_argument(
     'date',
     type=str,
     help='game date',
 )
 
-predict.add_argument(
+predict_p.add_argument(
     'home',
     type=str,
     help='home team',
 )
 
-predict.add_argument(
+predict_p.add_argument(
     'away',
     type=str,
     help='away team',
 )
 
 # ranking parameters
-rank = subparsers.add_parser('rank')
+rank_p = subparsers.add_parser('rank')
 
+# validation parameters
+validate_p = subparsers.add_parser('validate')
+
+# parse args
 args = parser.parse_args()
 kwargs = vars(args)
 subparser = kwargs.pop('subparser')
 
+# execute model function
 if subparser == 'update':
     refresh = kwargs['refresh']
     data.load_games(refresh=refresh)
@@ -106,6 +112,10 @@ elif subparser == 'rank':
         df.index += 1
 
         print(df.round(decimals=1), '\n')
+
+elif subparser == 'validate':
+    validate.assess_predictions('spread')
+    validate.assess_predictions('total')
 
 else:
     raise ValueError("No such argument {}".format(subparser))

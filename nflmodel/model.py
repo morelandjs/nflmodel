@@ -21,13 +21,12 @@ class MeloNFL(Melo):
     using the Margin-dependent Elo (MELO) model.
 
     """
-    def __init__(self, mode, kfactor, home_field, halflife, fatigue):
+    def __init__(self, mode, kfactor, regress, fatigue):
 
         # hyperparameters
         self.mode = mode
         self.kfactor = kfactor
-        self.home_field = home_field
-        self.halflife = halflife
+        self.regress = lambda months: regress if months > 3 else 0
         self.fatigue = fatigue
 
         # model operation mode: 'spread' or 'total'
@@ -48,7 +47,7 @@ class MeloNFL(Melo):
         # instantiate the Melo base class
         super(MeloNFL, self).__init__(
             self.kfactor, lines=self.lines, sigma=1.0,
-            regress=self.regress, regress_unit='year',
+            regress=self.regress, regress_unit='month',
             commutes=self.commutes)
 
         # calibrate the model using the game data
@@ -65,8 +64,8 @@ class MeloNFL(Melo):
 
         # compute mean absolute error for calibration
         burnin = 256
-        residuals = self.residuals()
-        self.loss = np.abs(residuals[burnin:]).mean()
+        residuals = self.residuals()[burnin:]
+        self.loss = np.abs(residuals).mean()
 
     def format_gamedata(self, games):
         """
@@ -116,20 +115,12 @@ class MeloNFL(Melo):
         home_fatigue = self.fatigue * np.exp(-games.home_rest.dt.days / 7.)
         away_fatigue = self.fatigue * np.exp(-games.away_rest.dt.days / 7.)
         relative_fatigue = self.compare(home_fatigue, away_fatigue)
-        games['home_bias'] = self.home_field - relative_fatigue
+        games['home_bias'] = -relative_fatigue
 
         # drop unwanted columns
         games.drop(columns=['date_home_prev', 'date_away_prev'], inplace=True)
 
         return games
-
-    def regress(self, years):
-        """
-        Regresses future ratings to the mean.
-
-        """
-        with np.errstate(divide='ignore'):
-            return 1 - .5**np.divide(years, self.halflife)
 
     def bias(self, home_rest_days, away_rest_days):
         """
@@ -140,67 +131,7 @@ class MeloNFL(Melo):
         home_fatigue = self.fatigue * np.exp(-home_rest_days / 7.)
         away_fatigue = self.fatigue * np.exp(-away_rest_days / 7.)
 
-        return self.home_field - self.compare(home_fatigue, away_fatigue)
-
-    def probability(self, times, labels1, labels2, bias=None, lines=0):
-        """
-        Survival function probability distribution
-
-        """
-        bias = self.home_field if bias is None else bias
-        return super(MeloNFL, self).probability(
-            times, labels1, labels2, bias=bias, lines=lines
-        )
-
-    def percentile(self, times, labels1, labels2, bias=None, p=50):
-        """
-        Distribution percentiles
-
-        """
-        bias = self.home_field if bias is None else bias
-        return super(MeloNFL, self).percentile(
-            times, labels1, labels2, bias=bias, p=p
-        )
-
-    def quantile(self, times, labels1, labels2, bias=None, q=.5):
-        """
-        Distribution quantiles
-
-        """
-        bias = self.home_field if bias is None else bias
-        return super(MeloNFL, self).quantile(
-            times, labels1, labels2, bias=bias, q=q
-        )
-
-    def mean(self, times, labels1, labels2, bias=None):
-        """
-        Distribution mean
-
-        """
-        bias = self.home_field if bias is None else bias
-        return super(MeloNFL, self).mean(
-            times, labels1, labels2, bias=bias
-        )
-
-    def median(self, times, labels1, labels2, bias=None):
-        """
-        Distribution median
-
-        """
-        bias = self.home_field if bias is None else bias
-        return super(MeloNFL, self).median(
-            times, labels1, labels2, bias=bias
-        )
-
-    def sample(self, times, labels1, labels2, bias=None, size=100):
-        """
-        Sample the distribution
-
-        """
-        bias = self.home_field if bias is None else bias
-        return super(MeloNFL, self).sample(
-            times, labels1, labels2, bias=bias, size=size
-        )
+        return -self.compare(home_fatigue, away_fatigue)
 
     @classmethod
     def from_cache(cls, mode, steps=200, retrain=False):
@@ -222,8 +153,7 @@ class MeloNFL(Melo):
 
         space = (
             hp.uniform('kfactor', 0.0, 0.5),
-            hp.uniform('home_field', 0.0, 0.5),
-            hp.uniform('halflife', 0.0, 5.0),
+            hp.uniform('regress', 0.0, 1.0),
             hp.uniform('fatigue', 0.0, 1.0),
         )
 
@@ -239,7 +169,7 @@ class MeloNFL(Melo):
         plotdir.mkdir(exist_ok=True)
 
         fig, axes = plt.subplots(
-            ncols=4, figsize=(12, 3), sharey=True)
+            ncols=3, figsize=(12, 3), sharey=True)
 
         losses = trials.losses()
 
