@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import argparse
 from datetime import datetime
@@ -108,7 +108,10 @@ elif subparser == 'predict':
 elif subparser == 'rank':
     for mode in ['spread', 'total']:
         melo_nfl = model.MeloNFL.from_cache(mode, retrain=False)
-        df = pd.DataFrame(melo_nfl.rank(now), columns=['team', f'mean {mode}'])
+        df = pd.DataFrame(
+            melo_nfl.rank(now),
+            columns=['team', 'mean {}'.format(mode)]
+        )
         df.index += 1
 
         print(df.round(decimals=1), '\n')

@@ -15,10 +15,12 @@ logging.basicConfig(
 
 now = datetime.now()
 
-home = Path.home()
-workdir = Path.cwd()
+home = Path(os.getenv('HOME'))
+workdir = Path(os.getenv('WORKDIR', '.'))
 
 cachedir = home / '.local/share/nflmodel'
-cachedir.mkdir(parents=True, exist_ok=True)
+
+if not cachedir.exists():
+    cachedir.mkdir(parents=True)
 
 dbfile = cachedir / 'nfldb.sqlite'

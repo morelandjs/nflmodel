@@ -159,14 +159,16 @@ class MeloNFL(Melo):
 
         trials = Trials()
 
-        logging.info(f'optimizing {mode} hyperparameters')
+        logging.info('optimizing {} hyperparameters'.format(mode))
 
         parameters = fmin(objective, space, algo=tpe.suggest,
                           max_evals=steps, trials=trials,
                           show_progressbar=False)
 
         plotdir = cachedir / 'plots'
-        plotdir.mkdir(exist_ok=True)
+
+        if not plotdir.exists():
+            plotdir.mkdir()
 
         fig, axes = plt.subplots(
             ncols=3, figsize=(12, 3), sharey=True)
@@ -189,7 +191,9 @@ class MeloNFL(Melo):
 
         logging.info('writing cache file %s', cachefile)
 
-        cachefile.parent.mkdir(exist_ok=True)
-        dump(model, cachefile, protocol=pickle.HIGHEST_PROTOCOL)
+        if not cachefile.parent.exists():
+            cachefile.parent.mkdir()
+
+        dump(model, cachefile, protocol=2)
 
         return model

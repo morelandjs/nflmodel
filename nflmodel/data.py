@@ -53,7 +53,7 @@ def update_database(conn, refresh=False):
     for season in range(start_season, end_season + 1):
 
         # print progress to stdout
-        logging.info(f'season {season}')
+        logging.info('season {}'.format(season))
 
         # loop over games in season and week
         for g in nflgame.games_gen(season, kind='REG'):
