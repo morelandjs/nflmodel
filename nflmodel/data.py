@@ -31,7 +31,7 @@ def initialize_database(conn):
     conn.commit()
 
 
-def update_database(conn, refresh=False):
+def update_database(conn, rebuild=False):
     """
     Save games to the SQL database.
 
@@ -42,7 +42,7 @@ def update_database(conn, refresh=False):
 
     start_season = (
         2009 if (last_update is None) or
-        (refresh is True) else last_update[0]
+        (rebuild is True) else last_update[0]
     )
 
     end_season = now.year
@@ -57,7 +57,6 @@ def update_database(conn, refresh=False):
 
         # loop over games in season and week
         for g in nflgame.games_gen(season, kind='REG'):
-
             date = '-'.join([g.eid[:4], g.eid[4:6], g.eid[6:8]])
             week = g.schedule['week']
             values = (date, season, week,
@@ -81,19 +80,19 @@ def update_database(conn, refresh=False):
     conn.commit()
 
 
-def load_games(refresh=False):
+def load_games(refresh=False, rebuild=False):
     """
     Establish connection, then initialize and update database
 
     """
     engine = create_engine(r"sqlite:///{}".format(dbfile))
 
-    if not refresh and dbfile.exists():
+    if not (refresh or rebuild) and dbfile.exists():
         return pd.read_sql_table('games', engine)
 
     conn = sqlite3.connect(str(dbfile))
     initialize_database(conn)
-    update_database(conn, refresh=refresh)
+    update_database(conn, rebuild=rebuild)
     conn.close()
 
     return pd.read_sql_table('games', engine)

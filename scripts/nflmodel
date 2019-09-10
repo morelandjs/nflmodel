@@ -32,7 +32,7 @@ subparsers = parser.add_subparsers(
 update_p = subparsers.add_parser('update')
 
 update_p.add_argument(
-    '--refresh',
+    '--rebuild',
     default=False,
     action='store_true',
     help='wipe and rebuild the sql database',
@@ -82,8 +82,8 @@ subparser = kwargs.pop('subparser')
 
 # execute model function
 if subparser == 'update':
-    refresh = kwargs['refresh']
-    data.load_games(refresh=refresh)
+    rebuild = kwargs['rebuild']
+    data.load_games(refresh=True, rebuild=rebuild)
 
 elif subparser == 'train':
     steps = kwargs['steps']

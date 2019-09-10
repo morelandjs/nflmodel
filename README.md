@@ -3,7 +3,7 @@ NFL Model
 
 *NFL ratings and predictions*
 
-This package trains the margin-dependent Elo (MELO) model on NFL game data.
+This package trains the margin-dependent Elo model (MELO) on NFL game data.
 
 Installation
 ------------

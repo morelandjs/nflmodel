@@ -40,7 +40,7 @@ class MeloNFL(Melo):
         }[mode]
 
         # connect to nfl stats database
-        games_ = load_games(refresh=False)
+        games_ = load_games(refresh=False, rebuild=False)
         self.games = self.format_gamedata(games_)
 
         # instantiate the Melo base class
