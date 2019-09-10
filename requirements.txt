@@ -1,0 +1,4 @@
+melo==1.0.3
+nflmodel==0.1
+numpy==1.17.2
+scipy==1.3.1

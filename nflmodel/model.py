@@ -2,7 +2,6 @@
 
 import logging
 import operator
-import pickle
 
 from hyperopt import fmin, hp, tpe, Trials
 from joblib import dump, load
@@ -59,7 +58,7 @@ class MeloNFL(Melo):
                 self.games.score_home,
                 self.games.score_away,
             ),
-            self.games.home_bias
+            self.games.fatigue
         )
 
         # compute mean absolute error for calibration
@@ -114,24 +113,12 @@ class MeloNFL(Melo):
         # add bias factors
         home_fatigue = self.fatigue * np.exp(-games.home_rest.dt.days / 7.)
         away_fatigue = self.fatigue * np.exp(-games.away_rest.dt.days / 7.)
-        relative_fatigue = self.compare(home_fatigue, away_fatigue)
-        games['home_bias'] = -relative_fatigue
+        games['fatigue'] = self.compare(away_fatigue, home_fatigue)
 
         # drop unwanted columns
         games.drop(columns=['date_home_prev', 'date_away_prev'], inplace=True)
 
         return games
-
-    def bias(self, home_rest_days, away_rest_days):
-        """
-        Computes circumstantial bias factor given each team's rest.
-        Accounts for home field advantage and rest.
-
-        """
-        home_fatigue = self.fatigue * np.exp(-home_rest_days / 7.)
-        away_fatigue = self.fatigue * np.exp(-away_rest_days / 7.)
-
-        return -self.compare(home_fatigue, away_fatigue)
 
     @classmethod
     def from_cache(cls, mode, steps=100, retrain=False):

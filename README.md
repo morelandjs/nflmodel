@@ -3,14 +3,14 @@ NFL Model
 
 *NFL ratings and predictions*
 
-This module trains the margin-dependent Elo (melo) model on NFL game data.
+This package trains the margin-dependent Elo (MELO) model on NFL game data.
 
 Installation
 ------------
 
 ```
-git clone git@github.com:morelandjs/melo-nfl.git && cd melo-nfl
-pip install .
+git clone git@github.com:morelandjs/nfl-model.git && cd nfl-model
+pip install -r requirements.txt
 ```
 
 Quick Start
