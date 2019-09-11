@@ -85,18 +85,16 @@ class MeloNFL(Melo):
         # game dates for every team
         game_dates = pd.concat([
             games[['date', 'team_home']].rename(
-                columns={'team_home': 'team'}
-            ),
+                columns={'team_home': 'team'}),
             games[['date', 'team_away']].rename(
-                columns={'team_away': 'team'}
-            ),
+                columns={'team_away': 'team'}),
         ]).sort_values('date')
 
         # calculate rest days
         for team in ['home', 'away']:
             games_prev = game_dates.rename(
-                columns={'team': 'team_{}'.format(team)}
-            )
+                columns={'team': 'team_{}'.format(team)})
+
             games_prev['date_{}_prev'.format(team)] = games.date
 
             games = pd.merge_asof(
