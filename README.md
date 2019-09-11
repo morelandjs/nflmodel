@@ -10,7 +10,7 @@ Installation
 
 ```
 git clone git@github.com:morelandjs/nfl-model.git && cd nfl-model
-pip install -r requirements.txt
+pip install .
 ```
 
 Quick Start

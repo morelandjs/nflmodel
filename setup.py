@@ -7,5 +7,18 @@ setup(
     author='J. Scott Moreland',
     author_email='morelandjs@gmail.com',
     packages=['nflmodel'],
-    scripts=['scripts/nflmodel']
+    scripts=['scripts/nflmodel'],
+    install_requires=[
+        'melo',
+        'numpy',
+        'matplotlib',
+        'scipy >= 0.18.0',
+        'joblib',
+        'nflgame_redux >= 2.0.1a1',
+        'nfl-model @ git+https://github.com/morelandjs/nfl-model.git',
+        'pandas',
+        'setuptools',
+        'SQLAlchemy',
+        'hyperopt'
+    ]
 )
