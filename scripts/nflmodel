@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os
 import sys
@@ -18,6 +18,7 @@ logging.basicConfig(
 )
 
 now = datetime.now()
+last_week = now - timedelta(days=7)
 
 parser = argparse.ArgumentParser(
     description='NFL ratings and predictions'
@@ -108,10 +109,24 @@ elif subparser == 'predict':
 elif subparser == 'rank':
     for mode in ['spread', 'total']:
         melo_nfl = model.MeloNFL.from_cache(mode, retrain=False)
-        df = pd.DataFrame(
+
+        current_rankings = pd.DataFrame(
             melo_nfl.rank(now),
-            columns=['team', 'mean {}'.format(mode)]
+            columns=['team', 'rank']
         )
+
+        previous_rankings = pd.DataFrame(
+            melo_nfl.rank(last_week),
+            columns=['team', 'rank_prev']
+        )
+
+        df = current_rankings.merge(
+            previous_rankings, on='team', how='inner'
+        )
+
+        df['change'] = df['rank'] - df['rank_prev']
+        df.drop(columns='rank_prev', inplace=True)
+        df.columns = ['team', 'mean {}'.format(mode), 'change']
         df.index += 1
 
         print(df.round(decimals=1), '\n')
