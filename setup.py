@@ -15,7 +15,6 @@ setup(
         'scipy >= 0.18.0',
         'joblib',
         'nflgame_redux >= 2.0.1a1',
-        'nfl-model @ git+https://github.com/morelandjs/nfl-model.git',
         'pandas',
         'setuptools',
         'SQLAlchemy',

@@ -56,7 +56,7 @@ def update_database(conn, rebuild=False):
         logging.info('season {}'.format(season))
 
         # loop over games in season and week
-        for g in nflgame.games_gen(season, kind='REG'):
+        for g in nflgame.games_gen(season, kind='REG', started=True):
             date = '-'.join([g.eid[:4], g.eid[4:6], g.eid[6:8]])
             week = g.schedule['week']
             values = (date, season, week,
