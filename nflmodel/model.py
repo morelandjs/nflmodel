@@ -49,7 +49,39 @@ class MeloNFL(Melo):
             regress=self.regress, regress_unit='month',
             commutes=self.commutes)
 
-        # calibrate the model using the game data
+        # train the model
+        self.train(condition_prior=True)
+
+    def train(self, condition_prior=False):
+        """
+        Retrain the model on the most current game data.
+
+        """
+        logging.info('training %s model', self.mode)
+
+        # read the nfl stats database
+        self.games = self.format_gamedata(
+            load_games(refresh=False, rebuild=False))
+
+        # condition the prior using output of the model
+        if condition_prior is True:
+            self.fit(
+                self.games.date,
+                self.games.team_home,
+                self.games.team_away,
+                self.compare(
+                    self.games.score_home,
+                    self.games.score_away,
+                ),
+                self.games.fatigue
+            )
+
+            self.prior_rating.update({
+                label: self.ratings_history[label].rating.mean(axis=0)
+                for label in self.labels
+            })
+
+        # train the model
         self.fit(
             self.games.date,
             self.games.team_home,
@@ -130,8 +162,8 @@ class MeloNFL(Melo):
 
         if not retrain and cachefile.exists():
             logging.debug('loading {} model from cache', mode)
-            model = load(cachefile)
-            return model
+
+            return load(cachefile)
 
         def objective(params):
             return cls(mode, *params).loss

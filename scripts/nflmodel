@@ -84,7 +84,13 @@ subparser = kwargs.pop('subparser')
 # execute model function
 if subparser == 'update':
     rebuild = kwargs['rebuild']
-    data.load_games(refresh=True, rebuild=rebuild)
+    games = data.load_games(refresh=True, rebuild=rebuild)
+
+    for mode in ['spread', 'total']:
+        melo_nfl = model.MeloNFL.from_cache(mode, retrain=False)
+        melo_nfl.train()
+
+    logging.info('last game: %s', games.date.max())
 
 elif subparser == 'train':
     steps = kwargs['steps']
