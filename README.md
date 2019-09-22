@@ -25,7 +25,7 @@ nflmodel train --steps 100
 ```
 Finally, compute point spread and point total predictions
 ```
-nflmodel predict 2018-12-30 TB LAR
+nflmodel predict 2018-12-30 TB LA
 nflmodel predict 2019-09-05 CLE TEN
 ```
 The model also ranks teams by their mean expected point spread (and point total) against a league average opponent.
