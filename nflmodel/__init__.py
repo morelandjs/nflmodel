@@ -13,6 +13,8 @@ logging.basicConfig(
     level=os.getenv('LOGLEVEL', 'info').upper()
 )
 
+logging.getLogger('nflgame').setLevel(logging.WARNING)
+
 now = datetime.now()
 
 home = Path(os.getenv('HOME'))

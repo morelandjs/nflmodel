@@ -20,13 +20,13 @@ class MeloNFL(Melo):
     using the Margin-dependent Elo (MELO) model.
 
     """
-    def __init__(self, mode, kfactor, regress, fatigue):
+    def __init__(self, mode, kfactor, regress, rest_bonus):
 
         # hyperparameters
         self.mode = mode
         self.kfactor = kfactor
         self.regress = lambda months: regress if months > 3 else 0
-        self.fatigue = fatigue
+        self.rest_bonus = rest_bonus
 
         # model operation mode: 'spread' or 'total'
         if self.mode not in ['spread', 'total']:
@@ -39,73 +39,69 @@ class MeloNFL(Melo):
             'spread': (False, operator.sub, np.arange(-59.5, 60.5)),
         }[mode]
 
-        # connect to nfl stats database
-        games_ = load_games(refresh=False, rebuild=False)
-        self.games = self.format_gamedata(games_)
+        self.games = self.format_gamedata(
+            load_games(update=False, rebuild=False))
 
-        # instantiate the Melo base class
-        super(MeloNFL, self).__init__(
-            self.kfactor, lines=self.lines, sigma=1.0,
-            regress=self.regress, regress_unit='month',
-            commutes=self.commutes)
-
-        # train the model
-        self.train(condition_prior=True)
+        # compute optimization loss
+        self.loss = self.train(condition_prior=True)
 
     def train(self, condition_prior=False):
         """
         Retrain the model on the most current game data.
 
         """
-        logging.info('training %s model', self.mode)
-
-        # read the nfl stats database
-        self.games = self.format_gamedata(
-            load_games(refresh=False, rebuild=False))
+        # instantiate the Melo base class
+        super(MeloNFL, self).__init__(
+            self.kfactor, lines=self.lines, sigma=1.0,
+            regress=self.regress, regress_unit='month',
+            commutes=self.commutes)
 
         # condition the prior using output of the model
         if condition_prior is True:
             self.fit(
                 self.games.date,
-                self.games.team_home,
-                self.games.team_away,
+                self.games.home,
+                self.games.away,
                 self.compare(
                     self.games.score_home,
                     self.games.score_away,
                 ),
-                self.games.fatigue
+                self.games.rest_bonus
             )
 
             self.prior_rating.update({
-                label: self.ratings_history[label].rating.mean(axis=0)
+                label: self.record[label].rating.mean(axis=0)
                 for label in self.labels
             })
 
         # train the model
         self.fit(
             self.games.date,
-            self.games.team_home,
-            self.games.team_away,
+            self.games.home,
+            self.games.away,
             self.compare(
                 self.games.score_home,
                 self.games.score_away,
             ),
-            self.games.fatigue
+            self.games.rest_bonus
         )
 
         # compute mean absolute error for calibration
         burnin = 256
         residuals = self.residuals()[burnin:]
-        self.loss = np.abs(residuals).mean()
+
+        return np.sqrt(np.square(residuals).mean())
 
     def format_gamedata(self, games):
         """
-        Generator that yields a tuple of attributes for each game.
+        Preprocesses raw game data, returning a model input table.
 
         """
+        # convert dates to datetime type
+        games['date'] = pd.to_datetime(games.date)
+
         # sort games by date
-        games.date = pd.to_datetime(games.date)
-        games.sort_values('date', inplace=True)
+        games = games.sort_values('date')
 
         # give jacksonville jaguars a single name
         games.replace('JAC', 'JAX', inplace=True)
@@ -136,17 +132,27 @@ class MeloNFL(Melo):
             )
 
         # add rest days columns
-        rested = pd.Timedelta('255 days')
-        games['home_rest'] = (games.date - games.date_home_prev).fillna(rested)
-        games['away_rest'] = (games.date - games.date_away_prev).fillna(rested)
+        ten_days = pd.Timedelta('10 days')
+        games['home_rested'] = (games.date - games.date_home_prev) > ten_days
+        games['away_rested'] = (games.date - games.date_away_prev) > ten_days
 
         # add bias factors
-        home_fatigue = self.fatigue * np.exp(-games.home_rest.dt.days / 7.)
-        away_fatigue = self.fatigue * np.exp(-games.away_rest.dt.days / 7.)
-        games['fatigue'] = self.compare(away_fatigue, home_fatigue)
+        games['rest_bonus'] = self.rest_bonus * self.compare(
+            games.home_rested.astype(int), games.away_rested.astype(int))
 
-        # drop unwanted columns
-        games.drop(columns=['date_home_prev', 'date_away_prev'], inplace=True)
+        # create home and away label columns
+        games['home'] = games['team_home'] + '|' + games['qb_home']
+        games['away'] = games['team_away'] + '|' + games['qb_away']
+
+        # reorder columns and drop uncecessary fields
+        games = games[[
+            'date',
+            'home',
+            'away',
+            'score_home',
+            'score_away',
+            'rest_bonus',
+        ]]
 
         return games
 
@@ -162,7 +168,6 @@ class MeloNFL(Melo):
 
         if not retrain and cachefile.exists():
             logging.debug('loading {} model from cache', mode)
-
             return load(cachefile)
 
         def objective(params):
@@ -171,7 +176,7 @@ class MeloNFL(Melo):
         space = (
             hp.uniform('kfactor', 0.0, 0.5),
             hp.uniform('regress', 0.0, 1.0),
-            hp.uniform('fatigue', -2.0, 2.0),
+            hp.uniform('rest_bonus', -0.5, 0.5),
         )
 
         trials = Trials()
@@ -188,7 +193,7 @@ class MeloNFL(Melo):
             plotdir.mkdir()
 
         fig, axes = plt.subplots(
-            ncols=3, figsize=(12, 3), sharey=True)
+            ncols=4, figsize=(12, 3), sharey=True)
 
         losses = trials.losses()
 

@@ -18,7 +18,6 @@ logging.basicConfig(
 )
 
 now = datetime.now()
-last_week = now - timedelta(days=7)
 
 parser = argparse.ArgumentParser(
     description='NFL ratings and predictions'
@@ -39,14 +38,14 @@ update_p.add_argument(
     help='wipe and rebuild the sql database',
 )
 
-# training parameters
-train_p = subparsers.add_parser('train')
+# calibrate parameters
+calibrate_p = subparsers.add_parser('calibrate')
 
-train_p.add_argument(
+calibrate_p.add_argument(
     '--steps',
     default=100,
     type=int,
-    help='number of training steps',
+    help='number of calibration steps',
 )
 
 # prediction parameters
@@ -83,16 +82,9 @@ subparser = kwargs.pop('subparser')
 
 # execute model function
 if subparser == 'update':
-    rebuild = kwargs['rebuild']
-    games = data.load_games(refresh=True, rebuild=rebuild)
+    data.load_games(update=True, rebuild=kwargs['rebuild'])
 
-    for mode in ['spread', 'total']:
-        melo_nfl = model.MeloNFL.from_cache(mode, retrain=False)
-        melo_nfl.train()
-
-    logging.info('last game: %s', games.date.max())
-
-elif subparser == 'train':
+elif subparser == 'calibrate':
     steps = kwargs['steps']
     for mode in ['spread', 'total']:
         model.MeloNFL.from_cache(mode, steps=steps, retrain=True)
@@ -116,26 +108,12 @@ elif subparser == 'rank':
     for mode in ['spread', 'total']:
         melo_nfl = model.MeloNFL.from_cache(mode, retrain=False)
 
-        current_rankings = pd.DataFrame(
+        rankings = pd.DataFrame(
             melo_nfl.rank(now),
             columns=['team', 'rank']
         )
 
-        previous_rankings = pd.DataFrame(
-            melo_nfl.rank(last_week),
-            columns=['team', 'rank_prev']
-        )
-
-        df = current_rankings.merge(
-            previous_rankings, on='team', how='inner'
-        )
-
-        df['change'] = df['rank'] - df['rank_prev']
-        df.drop(columns='rank_prev', inplace=True)
-        df.columns = ['team', 'mean {}'.format(mode), 'change']
-        df.index += 1
-
-        print(df.round(decimals=1), '\n')
+        print(rankings.round(decimals=1), '\n')
 
 elif subparser == 'validate':
     validate.assess_predictions('spread')
