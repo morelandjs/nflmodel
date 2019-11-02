@@ -77,7 +77,7 @@ class MeloNFL(Melo):
             )
 
             self.prior_rating.update({
-                label: self.ratings_history[label].rating.mean(axis=0)
+                label: self.record[label].rating.mean(axis=0)
                 for label in self.labels
             })
 
