@@ -20,13 +20,15 @@ class MeloNFL(Melo):
     using the Margin-dependent Elo (MELO) model.
 
     """
-    def __init__(self, mode, kfactor, regress, rest_bonus):
+    def __init__(self, mode, kfactor, regress, rest_bonus, exp_bonus, weight_qb):
 
         # hyperparameters
         self.mode = mode
         self.kfactor = kfactor
         self.regress = lambda months: regress if months > 3 else 0
         self.rest_bonus = rest_bonus
+        self.exp_bonus = exp_bonus
+        self.weight_qb = weight_qb
 
         # model operation mode: 'spread' or 'total'
         if self.mode not in ['spread', 'total']:
@@ -39,58 +41,69 @@ class MeloNFL(Melo):
             'spread': (False, operator.sub, np.arange(-59.5, 60.5)),
         }[mode]
 
+        # pre-process training data
         self.games = self.format_gamedata(
             load_games(update=False, rebuild=False))
 
-        # compute optimization loss
-        self.loss = self.train(condition_prior=True)
+        # compute optimization rms_error
+        self.rms_error = self.train(condition_prior=True)
 
-    def train(self, condition_prior=False):
+    def rest(self, games):
         """
-        Retrain the model on the most current game data.
+        Equal to rest_bonus if team is coming off bye week, 0 otherwise
 
         """
-        # instantiate the Melo base class
-        super(MeloNFL, self).__init__(
-            self.kfactor, lines=self.lines, sigma=1.0,
-            regress=self.regress, regress_unit='month',
-            commutes=self.commutes)
+        # game dates for every team
+        game_dates = pd.concat([
+            games[['date', 'team_home']].rename(
+                columns={'team_home': 'team'}),
+            games[['date', 'team_away']].rename(
+                columns={'team_away': 'team'}),
+        ]).sort_values('date')
 
-        # condition the prior using output of the model
-        if condition_prior is True:
-            self.fit(
-                self.games.date,
-                self.games.home,
-                self.games.away,
-                self.compare(
-                    self.games.score_home,
-                    self.games.score_away,
-                ),
-                self.games.rest_bonus
+        # compute days rested
+        for team in ['home', 'away']:
+            games_prev = game_dates.rename(
+                columns={'team': 'team_{}'.format(team)})
+
+            games_prev['date_{}_prev'.format(team)] = games.date
+
+            games = pd.merge_asof(
+                games, games_prev,
+                on='date', by='team_{}'.format(team),
+                allow_exact_matches=False
             )
 
-            self.prior_rating.update({
-                label: self.record[label].rating.mean(axis=0)
-                for label in self.labels
-            })
+        # true if team is comming off bye week, false otherwise
+        ten_days = pd.Timedelta('10 days')
+        games['home_rested'] = (games.date - games.date_home_prev) > ten_days
+        games['away_rested'] = (games.date - games.date_away_prev) > ten_days
 
-        # train the model
-        self.fit(
-            self.games.date,
-            self.games.home,
-            self.games.away,
-            self.compare(
-                self.games.score_home,
-                self.games.score_away,
-            ),
-            self.games.rest_bonus
+        # return rest bias correction
+        return self.rest_bonus * self.compare(
+            games.home_rested.astype(int),
+            games.away_rested.astype(int),
         )
 
-        # compute mean absolute error for calibration
-        burnin = 256
-        residuals = self.residuals()[burnin:]
+    def experience(self, games):
+        """
+        Equal to experience_factor * (1 - 0.5**games_played)
 
-        return np.sqrt(np.square(residuals).mean())
+        """
+        qb_games = pd.DataFrame(
+            np.vstack((games.qb_home, games.qb_away)).ravel('F'),
+            columns=['qb']
+        ).groupby('qb').cumcount(ascending=True)
+
+        qb_games = pd.DataFrame(
+            qb_games.values.reshape(-1, 2),
+            columns=['home_played', 'away_played'],
+        )
+
+        home_exp = 1 - np.exp(-qb_games.home_played / 16.)
+        away_exp = 1 - np.exp(-qb_games.away_played / 16.)
+
+        return self.exp_bonus * self.compare(home_exp, away_exp)
 
     def format_gamedata(self, games):
         """
@@ -118,43 +131,61 @@ class MeloNFL(Melo):
                 columns={'team_away': 'team'}),
         ]).sort_values('date')
 
-        # calculate rest days
-        for team in ['home', 'away']:
-            games_prev = game_dates.rename(
-                columns={'team': 'team_{}'.format(team)})
-
-            games_prev['date_{}_prev'.format(team)] = games.date
-
-            games = pd.merge_asof(
-                games, games_prev,
-                on='date', by='team_{}'.format(team),
-                allow_exact_matches=False
-            )
-
-        # add rest days columns
-        ten_days = pd.Timedelta('10 days')
-        games['home_rested'] = (games.date - games.date_home_prev) > ten_days
-        games['away_rested'] = (games.date - games.date_away_prev) > ten_days
-
-        # add bias factors
-        games['rest_bonus'] = self.rest_bonus * self.compare(
-            games.home_rested.astype(int), games.away_rested.astype(int))
-
         # create home and away label columns
-        games['home'] = games['team_home'] + '|' + games['qb_home']
-        games['away'] = games['team_away'] + '|' + games['qb_away']
+        games['home'] = games['team_home'] + '-' + games['qb_home']
+        games['away'] = games['team_away'] + '-' + games['qb_away']
+
+        # compute circumstantial bias factors
+        games['bias'] = self.rest(games) + self.experience(games)
 
         # reorder columns and drop uncecessary fields
         games = games[[
             'date',
             'home',
             'away',
+            'team_home',
+            'team_away',
+            'qb_home',
+            'qb_away',
             'score_home',
             'score_away',
-            'rest_bonus',
+            'bias',
         ]]
 
         return games
+
+    def train(self, condition_prior=False):
+        """
+        Retrain the model on the most current game data.
+
+        """
+        # rating is weighted average of team and qb ratings
+        def combine(team_rating, qb_rating):
+            return (1 - self.weight_qb)*team_rating + self.weight_qb*qb_rating
+
+        # instantiate the Melo base class
+        super(MeloNFL, self).__init__(
+            self.kfactor, lines=self.lines, sigma=1.0,
+            regress=self.regress, regress_unit='month',
+            commutes=self.commutes, combine=combine)
+
+        # train the model
+        self.fit(
+            self.games.date,
+            self.games.home,
+            self.games.away,
+            self.compare(
+                self.games.score_home,
+                self.games.score_away,
+            ),
+            self.games.bias
+        )
+
+        # compute mean absolute error for calibration
+        burnin = 256
+        residuals = self.residuals()[burnin:]
+
+        return np.sqrt(np.square(residuals).mean())
 
     @classmethod
     def from_cache(cls, mode, steps=100, retrain=False):
@@ -171,12 +202,14 @@ class MeloNFL(Melo):
             return load(cachefile)
 
         def objective(params):
-            return cls(mode, *params).loss
+            return cls(mode, *params).rms_error
 
         space = (
-            hp.uniform('kfactor', 0.0, 0.5),
+            hp.uniform('kfactor', 0.1, 0.4),
             hp.uniform('regress', 0.0, 1.0),
             hp.uniform('rest_bonus', -0.5, 0.5),
+            hp.uniform('exp_bonus', -0.3, 0.3),
+            hp.uniform('weight_qb', 0.0, 1.0),
         )
 
         trials = Trials()
@@ -193,7 +226,7 @@ class MeloNFL(Melo):
             plotdir.mkdir()
 
         fig, axes = plt.subplots(
-            ncols=4, figsize=(12, 3), sharey=True)
+            ncols=5, figsize=(12, 3), sharey=True)
 
         losses = trials.losses()
 

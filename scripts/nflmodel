@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 
 from nflmodel import data, model, validate
@@ -107,9 +108,12 @@ elif subparser == 'predict':
 elif subparser == 'rank':
     for mode in ['spread', 'total']:
         melo_nfl = model.MeloNFL.from_cache(mode, retrain=False)
-
+        teams = np.union1d(
+            melo_nfl.games.team_home,
+            melo_nfl.games.team_away,
+        )
         rankings = pd.DataFrame(
-            melo_nfl.rank(now),
+            melo_nfl.rank(now, teams),
             columns=['team', 'rank']
         )
 
