@@ -22,7 +22,7 @@ def initialize_database(conn):
     c = conn.cursor()
     c.execute("""
     CREATE TABLE IF NOT EXISTS games(
-        date TEXT,
+        datetime DATETIME,
         season INTEGER,
         week INTEGER,
         team_home TEXT,
@@ -31,10 +31,30 @@ def initialize_database(conn):
         team_away TEXT,
         qb_away TEXT,
         score_away INTEGER,
-        UNIQUE(date, team_home, team_away));
+        UNIQUE(datetime, team_home, team_away));
     """)
 
     conn.commit()
+
+
+def start_time(game):
+    """
+    Return game's datetime.
+
+    """
+    sched = game.schedule
+    year = sched['year']
+    month = sched['month']
+    day = sched['day']
+    time = sched['time']
+
+    if ('meridiem' in sched) and sched['meridiem'] in ['AM', 'PM']:
+        meridiem = sched['meridiem']
+    else:
+        meridiem = 'PM'
+
+    return datetime.strptime(f'{year}/{month}/{day} {time} {meridiem}',
+                         '%Y/%m/%d %I:%M %p')
 
 
 def starting_quarterbacks(game):
@@ -100,11 +120,9 @@ def update_database(conn, rebuild=False):
                 qb_home, qb_away = starting_quarterbacks(g)
 
                 try:
-                    date = '-'.join([g.eid[:4], g.eid[4:6], g.eid[6:8]])
-
                     c.execute("""
                         INSERT INTO games(
-                            date,
+                            datetime,
                             season,
                             week,
                             team_home,
@@ -114,7 +132,7 @@ def update_database(conn, rebuild=False):
                             qb_away,
                             score_away)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-                    """, (date, season, week, g.home, qb_home, g.score_home,
+                    """, (start_time(g), season, week, g.home, qb_home, g.score_home,
                           g.away, qb_away, g.score_away))
                 except sqlite3.IntegrityError:
                     continue
@@ -134,7 +152,7 @@ def load_games(update=False, rebuild=False):
 
     initialize_database(conn)
 
-    if update is True:
+    if update or rebuild or not dbfile.exists():
         update_database(conn, rebuild=rebuild)
 
     return pd.read_sql_table('games', engine)

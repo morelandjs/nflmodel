@@ -1,10 +1,11 @@
 """Trains model and exposes predictor class objects"""
 
+from datetime import datetime
 import logging
 import operator
+import pickle
 
 from hyperopt import fmin, hp, tpe, Trials
-from joblib import dump, load
 import matplotlib.pyplot as plt
 from melo import Melo
 import numpy as np
@@ -20,12 +21,13 @@ class MeloNFL(Melo):
     using the Margin-dependent Elo (MELO) model.
 
     """
-    def __init__(self, mode, kfactor, regress, rest_bonus, exp_bonus, weight_qb):
+    def __init__(self, mode, kfactor, regress_coeff,
+                 rest_bonus, exp_bonus, weight_qb):
 
         # hyperparameters
         self.mode = mode
         self.kfactor = kfactor
-        self.regress = lambda months: regress if months > 3 else 0
+        self.regress_coeff = regress_coeff
         self.rest_bonus = rest_bonus
         self.exp_bonus = exp_bonus
         self.weight_qb = weight_qb
@@ -42,79 +44,69 @@ class MeloNFL(Melo):
         }[mode]
 
         # pre-process training data
-        self.games = self.format_gamedata(
-            load_games(update=False, rebuild=False))
+        self.games = self.format_gamedata(load_games(update=False))
+        self.teams = np.union1d(self.games.team_home, self.games.team_away)
+        self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
 
-        # compute optimization rms_error
-        self.rms_error = self.train(condition_prior=True)
+        # train the model
+        self.rms_error = self.train()
 
-    def rest(self, games):
+    def regress(self, months):
         """
-        Equal to rest_bonus if team is coming off bye week, 0 otherwise
+        Regress ratings to the mean as a function of elapsed time.
+
+        Regression fraction equals self.regress_coeff if months > 3, else 0.
 
         """
-        # game dates for every team
-        game_dates = pd.concat([
-            games[['date', 'team_home']].rename(
-                columns={'team_home': 'team'}),
-            games[['date', 'team_away']].rename(
-                columns={'team_away': 'team'}),
-        ]).sort_values('date')
+        return self.regress_coeff if months > 3 else 0
 
-        # compute days rested
-        for team in ['home', 'away']:
-            games_prev = game_dates.rename(
-                columns={'team': 'team_{}'.format(team)})
+    def bias(self, games):
+        """
+        Circumstantial bias correction factor for each game.
 
-            games_prev['date_{}_prev'.format(team)] = games.date
+        The bias factor includes two terms: a rest factor which compares the rest
+        of each team, and an experience factor which compares the experience of
+        each quarterback.
 
-            games = pd.merge_asof(
-                games, games_prev,
-                on='date', by='team_{}'.format(team),
-                allow_exact_matches=False
-            )
-
-        # true if team is comming off bye week, false otherwise
-        ten_days = pd.Timedelta('10 days')
-        games['home_rested'] = (games.date - games.date_home_prev) > ten_days
-        games['away_rested'] = (games.date - games.date_away_prev) > ten_days
-
-        # return rest bias correction
-        return self.rest_bonus * self.compare(
-            games.home_rested.astype(int),
-            games.away_rested.astype(int),
+        """
+        rest_bias = self.rest_bonus * self.compare(
+            games.rested_home.astype(int),
+            games.rested_away.astype(int),
         )
 
-    def experience(self, games):
-        """
-        Equal to experience_factor * (1 - 0.5**games_played)
+        exp_bias = self.exp_bonus * self.compare(
+            -np.exp(-games.exp_home / 7.),
+            -np.exp(-games.exp_away / 7.),
 
-        """
-        qb_games = pd.DataFrame(
-            np.vstack((games.qb_home, games.qb_away)).ravel('F'),
-            columns=['qb']
-        ).groupby('qb').cumcount(ascending=True)
-
-        qb_games = pd.DataFrame(
-            qb_games.values.reshape(-1, 2),
-            columns=['home_played', 'away_played'],
         )
 
-        home_exp = 1 - np.exp(-qb_games.home_played / 16.)
-        away_exp = 1 - np.exp(-qb_games.away_played / 16.)
+        return rest_bias + exp_bias
 
-        return self.exp_bonus * self.compare(home_exp, away_exp)
+    def combine(self, team_rating, qb_rating):
+        """
+        Combines team and quarterback ratings to form a single rating
+
+        """
+        return (1 - self.weight_qb)*team_rating + self.weight_qb*qb_rating
 
     def format_gamedata(self, games):
         """
         Preprocesses raw game data, returning a model input table.
 
-        """
-        # convert dates to datetime type
-        games['date'] = pd.to_datetime(games.date)
+        This function calculates some new columns and adds them to the
+        games table:
 
+             column  description
+               home  home team name joined to home quarterback name
+               away  away team name joined to away quarterback name
+        rested_home  true if home team coming off bye week, false otherwise
+        rested_away  true if away team coming off bye week, false otherwise
+           exp_home  games played by the home quarterback
+           exp_away  games played by the away quarterback
+
+        """
         # sort games by date
-        games = games.sort_values('date')
+        games = games.sort_values('datetime')
 
         # give jacksonville jaguars a single name
         games.replace('JAC', 'JAX', inplace=True)
@@ -125,101 +117,92 @@ class MeloNFL(Melo):
 
         # game dates for every team
         game_dates = pd.concat([
-            games[['date', 'team_home']].rename(
+            games[['datetime', 'team_home']].rename(
                 columns={'team_home': 'team'}),
-            games[['date', 'team_away']].rename(
+            games[['datetime', 'team_away']].rename(
                 columns={'team_away': 'team'}),
-        ]).sort_values('date')
+        ]).sort_values('datetime')
 
         # create home and away label columns
         games['home'] = games['team_home'] + '-' + games['qb_home']
         games['away'] = games['team_away'] + '-' + games['qb_away']
 
-        # compute circumstantial bias factors
-        games['bias'] = self.rest(games) + self.experience(games)
+        # game dates for every team
+        game_dates = pd.concat([
+            games[['datetime', 'team_home']].rename(
+                columns={'team_home': 'team'}),
+            games[['datetime', 'team_away']].rename(
+                columns={'team_away': 'team'}),
+        ]).sort_values('datetime')
 
-        # reorder columns and drop uncecessary fields
-        games = games[[
-            'date',
-            'home',
-            'away',
-            'team_home',
-            'team_away',
-            'qb_home',
-            'qb_away',
-            'score_home',
-            'score_away',
-            'bias',
-        ]]
+        # compute days rested
+        for team in ['home', 'away']:
+            games_prev = game_dates.rename(
+                columns={'team': 'team_{}'.format(team)})
+
+            games_prev['date_{}_prev'.format(team)] = games.datetime
+
+            games = pd.merge_asof(
+                games, games_prev,
+                on='datetime', by='team_{}'.format(team),
+                allow_exact_matches=False
+            )
+
+        # true if team is comming off bye week, false otherwise
+        ten_days = pd.Timedelta('10 days')
+        games['rested_home'] = (games.datetime - games.date_home_prev) > ten_days
+        games['rested_away'] = (games.datetime - games.date_away_prev) > ten_days
+
+        # games played by each qb
+        qb_home = games[['datetime', 'qb_home']].rename(columns={'qb_home': 'qb'})
+        qb_away = games[['datetime', 'qb_away']].rename(columns={'qb_away': 'qb'})
+
+        qb_exp = pd.concat([qb_home, qb_away]).sort_values('datetime')
+        qb_exp['exp'] = qb_exp.groupby('qb').cumcount()
+
+        for team in ['home', 'away']:
+            games = games.merge(
+                qb_exp.rename(columns={'qb': f'qb_{team}', 'exp': f'exp_{team}'}),
+                on=['datetime', f'qb_{team}'],
+            )
 
         return games
 
-    def train(self, condition_prior=False):
+    def train(self):
         """
-        Retrain the model on the most current game data.
+        Trains the Margin Elo (MELO) model on the historical game data.
+
+        Returns the model's root-mean-square error.
 
         """
-        # rating is weighted average of team and qb ratings
-        def combine(team_rating, qb_rating):
-            return (1 - self.weight_qb)*team_rating + self.weight_qb*qb_rating
-
         # instantiate the Melo base class
         super(MeloNFL, self).__init__(
             self.kfactor, lines=self.lines, sigma=1.0,
             regress=self.regress, regress_unit='month',
-            commutes=self.commutes, combine=combine)
+            commutes=self.commutes, combine=self.combine)
 
         # train the model
         self.fit(
-            self.games.date,
+            self.games.datetime,
             self.games.home,
             self.games.away,
             self.compare(
                 self.games.score_home,
                 self.games.score_away,
             ),
-            self.games.bias
+            self.bias(self.games)
         )
 
         # compute mean absolute error for calibration
-        burnin = 256
-        residuals = self.residuals()[burnin:]
+        residuals = self.residuals()
 
-        return np.sqrt(np.square(residuals).mean())
+        return np.sqrt(np.square(residuals[256:]).mean())
 
-    @classmethod
-    def from_cache(cls, mode, steps=100, retrain=False):
+    def visualize_hyperopt(mode, trials, parameters):
         """
-        Optimizes the MeloNFL model hyper parameters. Returns cached values
-        if retrain is False and the parameters are cached, otherwise it
-        optimizes the parameters and saves them to the cache.
+        Visualize hyperopt loss minimization.
 
         """
-        cachefile = cachedir / '{}.pkl'.format(mode)
-
-        if not retrain and cachefile.exists():
-            logging.debug('loading {} model from cache', mode)
-            return load(cachefile)
-
-        def objective(params):
-            return cls(mode, *params).rms_error
-
-        space = (
-            hp.uniform('kfactor', 0.1, 0.4),
-            hp.uniform('regress', 0.0, 1.0),
-            hp.uniform('rest_bonus', -0.5, 0.5),
-            hp.uniform('exp_bonus', -0.3, 0.3),
-            hp.uniform('weight_qb', 0.0, 1.0),
-        )
-
-        trials = Trials()
-
-        logging.info('optimizing {} hyperparameters'.format(mode))
-
-        parameters = fmin(objective, space, algo=tpe.suggest,
-                          max_evals=steps, trials=trials,
-                          show_progressbar=False)
-
         plotdir = cachedir / 'plots'
 
         if not plotdir.exists():
@@ -235,6 +218,7 @@ class MeloNFL(Melo):
             ax.scatter(vals, losses, c=c)
             ax.axvline(parameters[label], color='k')
             ax.set_xlabel(label)
+
             if ax.is_first_col():
                 ax.set_ylabel('Mean absolute error')
 
@@ -242,13 +226,67 @@ class MeloNFL(Melo):
         plt.tight_layout()
         plt.savefig(str(plotfile))
 
+    def rank(self, time, statistic='mean'):
+        """
+        Modify melo ranking function to only consider teams (ignore qbs).
+
+        """
+        return super(MeloNFL, self).rank(
+            time, labels=self.teams, statistic=statistic)
+
+    @classmethod
+    def from_cache(cls, mode, steps=100, calibrate=False):
+        """
+        Optimizes the MeloNFL model hyper parameters. Returns cached values
+        if calibrate is False and the parameters are cached, otherwise it
+        optimizes the parameters and saves them to the cache.
+
+        """
+        cachefile = cachedir / '{}.pkl'.format(mode)
+
+        if not calibrate and cachefile.exists():
+            with cachefile.open(mode='rb') as f:
+                return pickle.load(f)
+
+        def objective(params):
+            return cls(mode, *params).rms_error
+
+        limits = {
+            'spread': [
+                ('kfactor',       0.1, 0.4),
+                ('regress_coeff', 0.1, 0.5),
+                ('rest_bonus',    0.0, 0.2),
+                ('exp_bonus',     0.0, 0.5),
+                ('weight_qb',     0.0, 1.0),
+            ],
+            'total': [
+                ('kfactor',       0.0, 0.3),
+                ('regress_coeff', 0.1, 0.5),
+                ('rest_bonus',    0.0, 0.2),
+                ('exp_bonus',     0.0, 0.5),
+                ('weight_qb',     0.0, 1.0),
+            ]
+        }
+
+        space = [hp.uniform(*lim) for lim in limits[mode]]
+
+        trials = Trials()
+
+        logging.info('calibrating {} hyperparameters'.format(mode))
+
+        load_games(update=True)
+
+        parameters = fmin(objective, space, algo=tpe.suggest, max_evals=steps,
+                      trials=trials, show_progressbar=False)
+
         model = cls(mode, **parameters)
 
-        logging.info('writing cache file %s', cachefile)
+        cls.visualize_hyperopt(mode, trials, parameters)
 
-        if not cachefile.parent.exists():
-            cachefile.parent.mkdir()
+        cachefile.parent.mkdir(exist_ok=True)
 
-        dump(model, cachefile, protocol=2)
+        with cachefile.open(mode='wb') as f:
+            logging.info('caching {} model to {}'.format(mode, cachefile))
+            pickle.dump(model, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         return model

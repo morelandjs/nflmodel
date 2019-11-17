@@ -21,7 +21,7 @@ def assess_predictions(mode):
     )
 
     # load nfl spread predictions
-    nfl_model = model.MeloNFL.from_cache(mode, retrain=False)
+    nfl_model = model.MeloNFL.from_cache(mode, calibrate=False)
 
     # standard normal distribution
     x = np.linspace(-4, 4, 1000)
