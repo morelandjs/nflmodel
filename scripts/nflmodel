@@ -158,24 +158,30 @@ elif subparser == 'predict':
         logging.info(msg)
 
 elif subparser == 'rank':
+    logging.info('Expected performance against a league average opponent')
     spreads = model.MeloNFL.from_cache('spread')
     totals = model.MeloNFL.from_cache('total')
 
+    winprob_rank = pd.DataFrame(
+        spreads.rank(now, statistic='win'),
+        columns=['win rank', 'win prob'],
+    ).round(decimals=2)
+
     spread_rank = pd.DataFrame(
-        spreads.rank(now),
-        columns=['spread rank', 'mean spread'],
-    )
+        spreads.rank(now, statistic='mean'),
+        columns=['spread rank', 'spread'],
+    ).round(decimals=1)
 
     total_rank = pd.DataFrame(
         totals.rank(now),
-        columns=['total rank', 'mean total'],
-    )
+        columns=['total rank', 'total'],
+    ).round(decimals=1)
 
-    rankings = spread_rank.join(total_rank)
+    rankings = winprob_rank.join(spread_rank.join(total_rank))
 
     rankings.index += 1
 
-    print(rankings.round(decimals=1), '\n')
+    print(rankings, '\n')
 
 elif subparser == 'validate':
     validate.assess_predictions('spread')

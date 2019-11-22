@@ -3,6 +3,7 @@
 from datetime import datetime
 import logging
 import operator
+import os
 import pickle
 
 from hyperopt import fmin, hp, tpe, Trials
@@ -11,7 +12,7 @@ from melo import Melo
 import numpy as np
 import pandas as pd
 
-from .data import load_games
+from .data import load_games, update_model
 from . import cachedir
 
 
@@ -245,8 +246,21 @@ class MeloNFL(Melo):
         cachefile = cachedir / '{}.pkl'.format(mode)
 
         if not calibrate and cachefile.exists():
-            with cachefile.open(mode='rb') as f:
-                return pickle.load(f)
+            cache_timestamp = datetime.fromtimestamp(
+                os.path.getmtime(cachefile))
+
+            model = pickle.load(cachefile.open(mode='rb'))
+
+            if update_model(cache_timestamp):
+                logging.info("updating model")
+                load_games(update=True)
+                model.train()
+
+                logging.info('caching {} model to {}'.format(mode, cachefile))
+                pickle.dump(model, cachefile.open(mode='wb'),
+                            protocol=pickle.HIGHEST_PROTOCOL)
+
+            return model
 
         def objective(params):
             return cls(mode, *params).rms_error

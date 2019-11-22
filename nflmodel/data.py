@@ -37,12 +37,11 @@ def initialize_database(conn):
     conn.commit()
 
 
-def start_time(game):
+def start_time(sched):
     """
     Return game's datetime.
 
     """
-    sched = game.schedule
     year = sched['year']
     month = sched['month']
     day = sched['day']
@@ -55,6 +54,17 @@ def start_time(game):
 
     return datetime.strptime(f'{year}/{month}/{day} {time} {meridiem}',
                          '%Y/%m/%d %I:%M %p')
+
+
+def update_model(cache_timestamp):
+    """
+    Return True is model needs updating, False otherwise.
+
+    """
+    games, last_updated = nflgame.sched._create_schedule()
+    game_times = [start_time(g) for g in games.values() if start_time(g) < now]
+
+    return True if cache_timestamp < max(game_times) else False
 
 
 def starting_quarterbacks(game):
@@ -115,8 +125,13 @@ def update_database(conn, rebuild=False):
             logging.info('updating season {} week {}'.format(season, week))
 
             # loop over games in season and week
-            for g in nflgame.games_gen(
-                season, week=week, kind='REG', started=True):
+            games = nflgame.games_gen(season, week=week, kind='REG', started=True)
+
+            # skip current week if games iterator is None
+            if games is None:
+                break
+
+            for g in games:
                 qb_home, qb_away = starting_quarterbacks(g)
 
                 try:
@@ -132,8 +147,8 @@ def update_database(conn, rebuild=False):
                             qb_away,
                             score_away)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-                    """, (start_time(g), season, week, g.home, qb_home, g.score_home,
-                          g.away, qb_away, g.score_away))
+                    """, (start_time(g.schedule), season, week, g.home,
+                          qb_home, g.score_home, g.away, qb_away, g.score_away))
                 except sqlite3.IntegrityError:
                     continue
 
