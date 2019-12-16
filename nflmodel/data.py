@@ -42,9 +42,10 @@ def start_time(sched):
     Return game's datetime.
 
     """
-    year = sched['year']
-    month = sched['month']
-    day = sched['day']
+    eid = sched['eid']
+    year = eid[:4]
+    month = eid[4:6]
+    day = eid[6:8]
     time = sched['time']
 
     if ('meridiem' in sched) and sched['meridiem'] in ['AM', 'PM']:
@@ -73,6 +74,9 @@ def starting_quarterbacks(game):
 
     """
     def quarterback(team):
+        if 'passing' not in game.data[team]['stats']:
+            print(game.data[team]['stats'].keys())
+        
         atts, qb = max([
             (d['att'], d['name'])
             for _, d in game.data[team]['stats']['passing'].items()
@@ -124,14 +128,11 @@ def update_database(conn, rebuild=False):
             # print progress to stdout
             logging.info('updating season {} week {}'.format(season, week))
 
-            # loop over games in season and week
-            games = nflgame.games_gen(season, week=week, kind='REG', started=True)
+            games_gen = nflgame.games_gen(season, week, kind='REG', started=True)
 
-            # skip current week if games iterator is None
-            if games is None:
-                break
+            # skip games which are not yet populated
+            for g in filter(None, games_gen):
 
-            for g in games:
                 qb_home, qb_away = starting_quarterbacks(g)
 
                 try:

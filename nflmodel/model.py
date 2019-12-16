@@ -49,6 +49,11 @@ class MeloNFL(Melo):
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
         self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
 
+        self.games["rest_number"] = self.compare(
+            self.games.rested_home.astype(int),
+            self.games.rested_away.astype(int)
+        )
+
         # train the model
         self.rms_error = self.train()
 
@@ -150,9 +155,17 @@ class MeloNFL(Melo):
             )
 
         # true if team is comming off bye week, false otherwise
-        ten_days = pd.Timedelta('10 days')
-        games['rested_home'] = (games.datetime - games.date_home_prev) > ten_days
-        games['rested_away'] = (games.datetime - games.date_away_prev) > ten_days
+        one_day = pd.Timedelta('1 days')
+        games['rested_home'] = (games.datetime - games.date_home_prev) / one_day
+        games['rested_away'] = (games.datetime - games.date_away_prev) / one_day
+
+        # set rested days to 7 (nominal) at beginning of the season
+        games['rested_home'] = games['rested_home'].where(games.week > 1, other=7)
+        games['rested_away'] = games['rested_away'].where(games.week > 1, other=7)
+
+        # limit rested days to two weeks
+        games['rested_home'] = games['rested_home'].clip(0, 14)
+        games['rested_away'] = games['rested_away'].clip(0, 14)
 
         # games played by each qb
         qb_home = games[['datetime', 'qb_home']].rename(columns={'qb_home': 'qb'})
@@ -195,9 +208,9 @@ class MeloNFL(Melo):
         )
 
         # compute mean absolute error for calibration
-        residuals = self.residuals()
+        residuals = self.residuals(statistic='mean')
 
-        return np.sqrt(np.square(residuals[256:]).mean())
+        return np.abs(residuals[256:]).mean()
 
     def visualize_hyperopt(mode, trials, parameters):
         """
@@ -219,6 +232,7 @@ class MeloNFL(Melo):
             ax.scatter(vals, losses, c=c)
             ax.axvline(parameters[label], color='k')
             ax.set_xlabel(label)
+            ax.set_xlim(min(vals), max(vals))
 
             if ax.is_first_col():
                 ax.set_ylabel('Mean absolute error')
@@ -267,16 +281,16 @@ class MeloNFL(Melo):
 
         limits = {
             'spread': [
-                ('kfactor',       0.1, 0.4),
-                ('regress_coeff', 0.1, 0.5),
-                ('rest_bonus',    0.0, 0.2),
-                ('exp_bonus',     0.0, 0.5),
-                ('weight_qb',     0.0, 1.0),
+                ('kfactor',       0.1,  0.4),
+                ('regress_coeff', 0.1,  0.5),
+                ('rest_bonus',    0.0, 0.02),
+                ('exp_bonus',     0.0,  0.5),
+                ('weight_qb',     0.0,  1.0),
             ],
             'total': [
                 ('kfactor',       0.0, 0.3),
                 ('regress_coeff', 0.1, 0.5),
-                ('rest_bonus',    0.0, 0.2),
+                ('rest_bonus',    0.0, 0.1),
                 ('exp_bonus',     0.0, 0.5),
                 ('weight_qb',     0.0, 1.0),
             ]
