@@ -23,7 +23,7 @@ class MeloNFL(Melo):
 
     """
     def __init__(self, mode, kfactor, regress_coeff,
-                 rest_bonus, exp_bonus, weight_qb):
+                 rest_bonus, exp_bonus, weight_qb, burnin=512):
 
         # hyperparameters
         self.mode = mode
@@ -32,6 +32,7 @@ class MeloNFL(Melo):
         self.rest_bonus = rest_bonus
         self.exp_bonus = exp_bonus
         self.weight_qb = weight_qb
+        self.burnin = burnin
 
         # model operation mode: 'spread' or 'total'
         if self.mode not in ['spread', 'total']:
@@ -49,13 +50,14 @@ class MeloNFL(Melo):
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
         self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
 
-        self.games["rest_number"] = self.compare(
-            self.games.rested_home.astype(int),
-            self.games.rested_away.astype(int)
-        )
-
         # train the model
-        self.rms_error = self.train()
+        self.train()
+
+        # compute performance metrics
+        self.residuals_ = self.residuals(standardize=False)
+        self.std_residuals_ = self.residuals(standardize=True)
+        self.mean_abs_error = np.mean(np.abs(self.residuals_[burnin:]))
+        self.rms_error = np.sqrt(np.mean(self.residuals_[burnin:]**2))
 
     def regress(self, months):
         """
@@ -75,14 +77,18 @@ class MeloNFL(Melo):
         each quarterback.
 
         """
+        rest_level_home = 1 - np.exp(-games.rest_days_home / 5.)
+        rest_level_away = 1 - np.exp(-games.rest_days_away / 5.)
+
         rest_bias = self.rest_bonus * self.compare(
-            games.rested_home.astype(int),
-            games.rested_away.astype(int),
+            rest_level_home, rest_level_away
         )
 
+        exp_level_home = 1 - np.exp(-games.exp_home / 7.)
+        exp_level_away = 1 - np.exp(-games.exp_away / 7.)
+
         exp_bias = self.exp_bonus * self.compare(
-            -np.exp(-games.exp_home / 7.),
-            -np.exp(-games.exp_away / 7.),
+            exp_level_home, exp_level_away,
 
         )
 
@@ -102,13 +108,13 @@ class MeloNFL(Melo):
         This function calculates some new columns and adds them to the
         games table:
 
-             column  description
-               home  home team name joined to home quarterback name
-               away  away team name joined to away quarterback name
-        rested_home  true if home team coming off bye week, false otherwise
-        rested_away  true if away team coming off bye week, false otherwise
-           exp_home  games played by the home quarterback
-           exp_away  games played by the away quarterback
+                column  description
+                  home  home team name joined to home quarterback name
+                  away  away team name joined to away quarterback name
+        rest_days_home  home team days rested
+        rest_days_away  away team days rested
+              exp_home  games played by the home quarterback
+              exp_away  games played by the away quarterback
 
         """
         # sort games by date
@@ -154,18 +160,14 @@ class MeloNFL(Melo):
                 allow_exact_matches=False
             )
 
-        # true if team is comming off bye week, false otherwise
+        # days rested since last game
         one_day = pd.Timedelta('1 days')
-        games['rested_home'] = (games.datetime - games.date_home_prev) / one_day
-        games['rested_away'] = (games.datetime - games.date_away_prev) / one_day
+        games['rest_days_home'] = (games.datetime - games.date_home_prev) / one_day
+        games['rest_days_away'] = (games.datetime - games.date_away_prev) / one_day
 
-        # set rested days to 7 (nominal) at beginning of the season
-        games['rested_home'] = games['rested_home'].where(games.week > 1, other=7)
-        games['rested_away'] = games['rested_away'].where(games.week > 1, other=7)
-
-        # limit rested days to two weeks
-        games['rested_home'] = games['rested_home'].clip(0, 14)
-        games['rested_away'] = games['rested_away'].clip(0, 14)
+        # set days rested to 7 at beginning of the season (resonable default)
+        games['rest_days_home'] = games['rest_days_home'].where(games.week > 1, other=7)
+        games['rest_days_away'] = games['rest_days_away'].where(games.week > 1, other=7)
 
         # games played by each qb
         qb_home = games[['datetime', 'qb_home']].rename(columns={'qb_home': 'qb'})
@@ -206,11 +208,6 @@ class MeloNFL(Melo):
             ),
             self.bias(self.games)
         )
-
-        # compute mean absolute error for calibration
-        residuals = self.residuals(statistic='mean')
-
-        return np.abs(residuals[256:]).mean()
 
     def visualize_hyperopt(mode, trials, parameters):
         """
@@ -277,21 +274,21 @@ class MeloNFL(Melo):
             return model
 
         def objective(params):
-            return cls(mode, *params).rms_error
+            return cls(mode, *params).mean_abs_error
 
         limits = {
             'spread': [
                 ('kfactor',       0.1,  0.4),
-                ('regress_coeff', 0.1,  0.5),
-                ('rest_bonus',    0.0, 0.02),
+                ('regress_coeff', 0.1,  0.3),
+                ('rest_bonus',    0.0,  0.3),
                 ('exp_bonus',     0.0,  0.5),
                 ('weight_qb',     0.0,  1.0),
             ],
             'total': [
-                ('kfactor',       0.0, 0.3),
-                ('regress_coeff', 0.1, 0.5),
-                ('rest_bonus',    0.0, 0.1),
-                ('exp_bonus',     0.0, 0.5),
+                ('kfactor',       0.1, 0.2),
+                ('regress_coeff', 0.0, 0.5),
+                ('rest_bonus',   -1.0, 0.0),
+                ('exp_bonus',    -0.1, 0.3),
                 ('weight_qb',     0.0, 1.0),
             ]
         }

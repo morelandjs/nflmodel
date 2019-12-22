@@ -29,15 +29,17 @@ def assess_predictions(mode):
     axl.plot(x, y, color='black')
 
     # raw residuals
-    residuals = nfl_model.residuals()[256:]
+    residuals = nfl_model.residuals_
+    mean_abs_error = nfl_model.mean_abs_error
+
     logging.info('{} residual mean: {:.2f}'
                  .format(mode, residuals.mean()))
     logging.info('{} residual mean absolute error: {:.2f}'
-                 .format(mode, np.abs(residuals).mean()))
+                 .format(mode, nfl_model.mean_abs_error))
 
     # standardized residuals
-    residuals = nfl_model.residuals(standardize=True)[256:]
-    axl.hist(residuals, bins=40, histtype='step', density=True)
+    std_residuals = nfl_model.std_residuals_
+    axl.hist(std_residuals, bins=40, histtype='step', density=True)
 
     # residual figure attributes
     axl.set_xlim(-4, 4)

@@ -74,9 +74,6 @@ def starting_quarterbacks(game):
 
     """
     def quarterback(team):
-        if 'passing' not in game.data[team]['stats']:
-            print(game.data[team]['stats'].keys())
-        
         atts, qb = max([
             (d['att'], d['name'])
             for _, d in game.data[team]['stats']['passing'].items()
@@ -130,12 +127,14 @@ def update_database(conn, rebuild=False):
 
             games_gen = nflgame.games_gen(season, week, kind='REG', started=True)
 
+            if games_gen is None:
+                break
+
             # skip games which are not yet populated
-            for g in filter(None, games_gen):
-
-                qb_home, qb_away = starting_quarterbacks(g)
-
+            for g in games_gen:
                 try:
+                    qb_home, qb_away = starting_quarterbacks(g)
+
                     c.execute("""
                         INSERT INTO games(
                             datetime,
@@ -150,7 +149,7 @@ def update_database(conn, rebuild=False):
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """, (start_time(g.schedule), season, week, g.home,
                           qb_home, g.score_home, g.away, qb_away, g.score_away))
-                except sqlite3.IntegrityError:
+                except (sqlite3.IntegrityError, KeyError):
                     continue
 
             conn.commit()
