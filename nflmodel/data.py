@@ -2,10 +2,8 @@
 
 from datetime import datetime
 import logging
-import os
 import requests
 import sqlite3
-import time
 
 import nflgame
 import pandas as pd
@@ -53,8 +51,10 @@ def start_time(sched):
     else:
         meridiem = 'PM'
 
-    return datetime.strptime(f'{year}/{month}/{day} {time} {meridiem}',
-                         '%Y/%m/%d %I:%M %p')
+    return datetime.strptime(
+        '{}/{}/{} {} {}'.format(year, month, day, time, meridiem),
+        '%Y/%m/%d %I:%M %p'
+    )
 
 
 def update_model(cache_timestamp):
@@ -125,7 +125,8 @@ def update_database(conn, rebuild=False):
             # print progress to stdout
             logging.info('updating season {} week {}'.format(season, week))
 
-            games_gen = nflgame.games_gen(season, week, kind='REG', started=True)
+            games_gen = nflgame.games_gen(
+                season, week, kind='REG', started=True)
 
             if games_gen is None:
                 break
@@ -147,8 +148,9 @@ def update_database(conn, rebuild=False):
                             qb_away,
                             score_away)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-                    """, (start_time(g.schedule), season, week, g.home,
-                          qb_home, g.score_home, g.away, qb_away, g.score_away))
+                    """, (start_time(g.schedule), season, week,
+                          g.home, qb_home, g.score_home, g.away, qb_away,
+                          g.score_away))
                 except (sqlite3.IntegrityError, KeyError):
                     continue
 

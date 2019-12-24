@@ -72,9 +72,9 @@ class MeloNFL(Melo):
         """
         Circumstantial bias correction factor for each game.
 
-        The bias factor includes two terms: a rest factor which compares the rest
-        of each team, and an experience factor which compares the experience of
-        each quarterback.
+        The bias factor includes two terms: a rest factor which compares the
+        rest of each team, and an experience factor which compares the
+        experience of each quarterback.
 
         """
         rest_level_home = 1 - np.exp(-games.rest_days_home / 5.)
@@ -162,24 +162,32 @@ class MeloNFL(Melo):
 
         # days rested since last game
         one_day = pd.Timedelta('1 days')
-        games['rest_days_home'] = (games.datetime - games.date_home_prev) / one_day
-        games['rest_days_away'] = (games.datetime - games.date_away_prev) / one_day
+        games['rest_days_home'] = \
+            (games.datetime - games.date_home_prev) / one_day
+        games['rest_days_away'] = \
+            (games.datetime - games.date_away_prev) / one_day
 
-        # set days rested to 7 at beginning of the season (resonable default)
-        games['rest_days_home'] = games['rest_days_home'].where(games.week > 1, other=7)
-        games['rest_days_away'] = games['rest_days_away'].where(games.week > 1, other=7)
+        # set days rested to 7 at beginning of the season (default)
+        games['rest_days_home'] = games['rest_days_home'].where(
+            games.week > 1, other=7)
+        games['rest_days_away'] = games['rest_days_away'].where(
+            games.week > 1, other=7)
 
         # games played by each qb
-        qb_home = games[['datetime', 'qb_home']].rename(columns={'qb_home': 'qb'})
-        qb_away = games[['datetime', 'qb_away']].rename(columns={'qb_away': 'qb'})
+        qb_home = games[['datetime', 'qb_home']].rename(
+            columns={'qb_home': 'qb'})
+        qb_away = games[['datetime', 'qb_away']].rename(
+            columns={'qb_away': 'qb'})
 
         qb_exp = pd.concat([qb_home, qb_away]).sort_values('datetime')
         qb_exp['exp'] = qb_exp.groupby('qb').cumcount()
 
         for team in ['home', 'away']:
             games = games.merge(
-                qb_exp.rename(columns={'qb': f'qb_{team}', 'exp': f'exp_{team}'}),
-                on=['datetime', f'qb_{team}'],
+                qb_exp.rename(columns={
+                    'qb': 'qb_{}'.format(team),
+                    'exp': 'exp_{}'.format(team)
+                }), on=['datetime', 'qb_{}'.format(team)],
             )
 
         return games
@@ -279,8 +287,8 @@ class MeloNFL(Melo):
         limits = {
             'spread': [
                 ('kfactor',       0.1,  0.4),
-                ('regress_coeff', 0.1,  0.3),
-                ('rest_bonus',    0.0,  0.3),
+                ('regress_coeff', 0.1,  0.5),
+                ('rest_bonus',    0.0,  0.5),
                 ('exp_bonus',     0.0,  0.5),
                 ('weight_qb',     0.0,  1.0),
             ],
@@ -302,7 +310,7 @@ class MeloNFL(Melo):
         load_games(update=True)
 
         parameters = fmin(objective, space, algo=tpe.suggest, max_evals=steps,
-                      trials=trials, show_progressbar=False)
+                          trials=trials, show_progressbar=False)
 
         model = cls(mode, **parameters)
 

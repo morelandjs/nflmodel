@@ -30,7 +30,6 @@ def assess_predictions(mode):
 
     # raw residuals
     residuals = nfl_model.residuals_
-    mean_abs_error = nfl_model.mean_abs_error
 
     logging.info('{} residual mean: {:.2f}'
                  .format(mode, residuals.mean()))
