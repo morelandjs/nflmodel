@@ -3,7 +3,6 @@
 import argparse
 from datetime import datetime
 import logging
-import os
 import sys
 
 import numpy as np
@@ -45,9 +44,9 @@ calibrate_p.add_argument(
 predict_p = subparsers.add_parser('predict')
 
 predict_p.add_argument(
-    'date',
+    'datetime',
     type=str,
-    help='game date',
+    help='datetime compatible string, e.g. 2020-01-01T01:00:00',
 )
 
 predict_p.add_argument(
@@ -82,6 +81,13 @@ forecast_p.add_argument(
 
 rank_p = subparsers.add_parser('rank')
 
+rank_p.add_argument(
+    '--datetime',
+    type=str,
+    help='datetime compatible string, e.g. 2020-01-01T01:00:00',
+    default=str(now),
+)
+
 validate_p = subparsers.add_parser('validate')
 
 args = parser.parse_args()
@@ -103,6 +109,9 @@ elif subparser == 'forecast':
         games = nflgame.games(kwargs['season'], week=kwargs['week'])
     except TypeError:
         sys.exit("cannot find schedule for specified forecast year")
+
+    logging.info('Forecast for season {} week {}\n'.format(
+        kwargs['season'], kwargs['week']))
 
     def date(game):
         return '-'.join([game.eid[:4], game.eid[4:6], game.eid[6:8]])
@@ -136,52 +145,68 @@ elif subparser == 'forecast':
 
     report.sort_values('spread', inplace=True)
 
-    print(report.round({"win prob": 2, "spread": 1, "total": 1}))
+    print(report.round({"win prob": 2, "spread": 1, "total": 1}), '\n')
 
 elif subparser == 'predict':
-    for mode in ['spread', 'total']:
-        melo_nfl = model.MeloNFL.from_cache(mode)
+    datetime = str(np.datetime64(kwargs['datetime'], 's'))
+    home = kwargs['home']
+    away = kwargs['away']
 
-        date, home, away = [
-            kwargs[k] for k in ['date', 'home', 'away']]
-
-        mean = melo_nfl.mean(date, home, away)
-        median = melo_nfl.median(date, home, away)
-        prob = melo_nfl.probability(date, home, away)
-
-        msg = "\n".join([
-            "mean {} = {:.1f}".format(mode, mean),
-            "median {} = {:.1f}".format(mode, median),
-            "win prob {} = {:.2f}".format(mode, prob),
-        ])
-
-        logging.info(msg)
-
-elif subparser == 'rank':
-    logging.info('Expected performance against a league average opponent')
+    logging.info('Predictions as of {}\n'.format(datetime))
     spreads = model.MeloNFL.from_cache('spread')
     totals = model.MeloNFL.from_cache('total')
 
-    winprob_rank = pd.DataFrame(
-        spreads.rank(now, statistic='win'),
-        columns=['win rank', 'win prob'],
-    ).round(decimals=2)
+    report = pd.DataFrame({
+        'date': [np.datetime64(datetime, 'D')],
+        'home': [home],
+        'away': [away],
+        'win prob': np.array(spreads.probability(datetime, home, away)),
+        'spread': np.array(spreads.median(datetime, home, away)),
+        'total': np.array(totals.median(datetime, home, away)),
+    }).set_index("date")
 
-    spread_rank = pd.DataFrame(
-        spreads.rank(now, statistic='mean'),
-        columns=['spread rank', 'spread'],
+    print(report.round({"win prob": 2, "spread": 1, "total": 1}), '\n')
+
+elif subparser == 'rank':
+    datetime = str(np.datetime64(kwargs['datetime'], 's'))
+    logging.info('Rankings as of {}\n'.format(datetime))
+    spreads = model.MeloNFL.from_cache('spread')
+    totals = model.MeloNFL.from_cache('total')
+
+    df = pd.DataFrame(
+        spreads.rank(datetime, statistic='win'),
+        columns=['team', 'win prob'],
+    )
+
+    df['win prob'] = df[['win prob']].applymap('{:.2f}'.format)
+    col1 = df['team'] + '  ' + df['win prob']
+
+    df = pd.DataFrame(
+        spreads.rank(datetime, statistic='mean'),
+        columns=['team', 'point spread'],
     ).round(decimals=1)
 
-    total_rank = pd.DataFrame(
-        totals.rank(now),
-        columns=['total rank', 'total'],
+    df['point spread'] = df[['point spread']].applymap('{:4.1f}'.format)
+    col2 = df['team'] + '  ' + df['point spread']
+
+    df = pd.DataFrame(
+        totals.rank(datetime),
+        columns=['team', 'point total'],
     ).round(decimals=1)
 
-    rankings = winprob_rank.join(spread_rank.join(total_rank))
+    df['point total'] = df[['point total']].applymap('{:4.1f}'.format)
+    col3 = df['team'] + '  ' + df['point total']
 
+    rankings = pd.concat([col1, col2, col3], axis=1)
+    rankings.insert(1, 'sep1', '│')
+    rankings.insert(3, 'sep2', '│')
+    rankings.columns = ['win prob', '', 'spread', '', 'total']
     rankings.index += 1
 
-    print(rankings, '\n')
+    rankings.index.name = 'rank'
+
+    print(rankings.to_string(header=True), '\n')
+
 
 elif subparser == 'validate':
     validate.assess_predictions('spread')
