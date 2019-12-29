@@ -293,10 +293,10 @@ class MeloNFL(Melo):
                 ('weight_qb',     0.0,  1.0),
             ],
             'total': [
-                ('kfactor',       0.1, 0.2),
+                ('kfactor',       0.0, 0.3),
                 ('regress_coeff', 0.0, 0.5),
-                ('rest_bonus',   -1.0, 0.0),
-                ('exp_bonus',    -0.1, 0.3),
+                ('rest_bonus',   -0.5, 0.0),
+                ('exp_bonus',     0.1, 0.4),
                 ('weight_qb',     0.0, 1.0),
             ]
         }
