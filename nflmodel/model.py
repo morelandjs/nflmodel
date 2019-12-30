@@ -50,6 +50,9 @@ class MeloNFL(Melo):
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
         self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
 
+        print(self.games.to_string())
+        quit()
+
         # train the model
         self.train()
 
@@ -118,7 +121,7 @@ class MeloNFL(Melo):
 
         """
         # sort games by date
-        games = games.sort_values('datetime')
+        games = games.sort_values(by=['datetime', 'team_home'])
 
         # give jacksonville jaguars a single name
         games.replace('JAC', 'JAX', inplace=True)
