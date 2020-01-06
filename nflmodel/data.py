@@ -40,20 +40,20 @@ def start_time(sched):
     Return game's datetime.
 
     """
-    eid = sched['eid']
+    eid = sched["eid"]
     year = eid[:4]
     month = eid[4:6]
     day = eid[6:8]
-    time = sched['time']
+    time = sched["time"]
 
-    if ('meridiem' in sched) and sched['meridiem'] in ['AM', 'PM']:
-        meridiem = sched['meridiem']
+    if ("meridiem" in sched) and sched["meridiem"] in ["AM", "PM"]:
+        meridiem = sched["meridiem"]
     else:
-        meridiem = 'PM'
+        meridiem = "PM"
 
     return datetime.strptime(
-        '{}/{}/{} {} {}'.format(year, month, day, time, meridiem),
-        '%Y/%m/%d %I:%M %p'
+        "{}/{}/{} {} {}".format(year, month, day, time, meridiem),
+        "%Y/%m/%d %I:%M %p"
     )
 
 
@@ -75,13 +75,13 @@ def starting_quarterbacks(game):
     """
     def quarterback(team):
         atts, qb = max([
-            (d['att'], d['name'])
-            for _, d in game.data[team]['stats']['passing'].items()
+            (d["att"], d["name"])
+            for _, d in game.data[team]["stats"]["passing"].items()
         ])
 
         return qb
 
-    return (quarterback('home'), quarterback('away'))
+    return (quarterback("home"), quarterback("away"))
 
 
 def get_current_season_week():
@@ -91,12 +91,12 @@ def get_current_season_week():
     For more api information visit http://www.nfl.com/feeds-rs?_wadl
 
     """
-    url = 'http://www.nfl.com/feeds-rs/currentWeek.json'
+    url = "http://www.nfl.com/feeds-rs/currentWeek.json"
     response = requests.get(url)
     output = response.json()
 
-    current_season = output['seasonId']
-    current_week = output['week']
+    current_season = output["seasonId"]
+    current_week = output["week"]
 
     return (current_season, current_week)
 
@@ -123,10 +123,10 @@ def update_database(conn, rebuild=False):
         for week in range(start_week, end_week + 1):
 
             # print progress to stdout
-            logging.info('updating season {} week {}'.format(season, week))
+            logging.info("updating season {} week {}".format(season, week))
 
             games_gen = nflgame.games_gen(
-                season, week, kind='REG', started=True)
+                season, week, kind="REG", started=True)
 
             if games_gen is None:
                 break
@@ -172,4 +172,4 @@ def load_games(update=False, rebuild=False):
     if update or rebuild or not dbfile.exists():
         update_database(conn, rebuild=rebuild)
 
-    return pd.read_sql_table('games', engine)
+    return pd.read_sql_table("games", engine)
