@@ -118,7 +118,7 @@ def update_database(conn, rebuild=False):
     )
 
     for season in range(start_season, current_season + 1):
-        end_week = current_week if season == current_season else 17
+        end_week = min(current_week, 17) if season == current_season else 17
 
         for week in range(start_week, end_week + 1):
 

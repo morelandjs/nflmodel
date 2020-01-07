@@ -33,6 +33,7 @@ predict_p = subparsers.add_parser("predict")
 forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
+wager_p = subparsers.add_parser("wager")
 
 update_p.add_argument(
     "--rebuild",
@@ -101,6 +102,42 @@ rank_p.add_argument(
     help="datetime compatible string, e.g. 2020-01-01T01:00:00",
     default=str(now),
 )
+
+#wager_p.add_argument(
+#    "date",
+#    type=str,
+#    help="game date",
+#)
+#
+#wager_p.add_argument(
+#    "away",
+#    type=str,
+#    help="away team",
+#)
+#
+#wager_p.add_argument(
+#    "away line",
+#    type=str,
+#    help="away line",
+#)
+#
+#wager_p.add_argument(
+#    "opp",
+#    type=str,
+#    help="opponent of the team you are betting on",
+#)
+#
+#wager_p.add_argument(
+#    "line",
+#    type=str,
+#    help="betting line for the team you are betting on",
+#)
+#
+#wager_p.add_argument(
+#    "vig",
+#    type=str,
+#    help="debit to bet 100 currency units; typical values are negative.",
+#)
 
 args = parser.parse_args()
 kwargs = vars(args)
