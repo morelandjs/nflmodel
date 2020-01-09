@@ -33,7 +33,8 @@ predict_p = subparsers.add_parser("predict")
 forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
-wager_p = subparsers.add_parser("wager")
+spread_p = subparsers.add_parser("spread")
+total_p = subparsers.add_parser("total")
 
 update_p.add_argument(
     "--rebuild",
@@ -69,15 +70,31 @@ predict_p.add_argument(
 )
 
 predict_p.add_argument(
-    "away",
+    "away-team",
     type=str,
     help="away team",
 )
 
 predict_p.add_argument(
-    "home",
+    "home-team",
     type=str,
     help="home team",
+)
+
+predict_p.add_argument(
+    "--spread",
+    type=float,
+    nargs=3,
+    metavar="float",
+    help="away vig, home vig, home point spread",
+)
+
+predict_p.add_argument(
+    "--total",
+    type=float,
+    nargs=3,
+    metavar="float",
+    help="over vig, under vig, point total",
 )
 
 forecast_p.add_argument(
@@ -103,41 +120,77 @@ rank_p.add_argument(
     default=str(now),
 )
 
-#wager_p.add_argument(
-#    "date",
-#    type=str,
-#    help="game date",
-#)
-#
-#wager_p.add_argument(
-#    "away",
-#    type=str,
-#    help="away team",
-#)
-#
-#wager_p.add_argument(
-#    "away line",
-#    type=str,
-#    help="away line",
-#)
-#
-#wager_p.add_argument(
-#    "opp",
-#    type=str,
-#    help="opponent of the team you are betting on",
-#)
-#
-#wager_p.add_argument(
-#    "line",
-#    type=str,
-#    help="betting line for the team you are betting on",
-#)
-#
-#wager_p.add_argument(
-#    "vig",
-#    type=str,
-#    help="debit to bet 100 currency units; typical values are negative.",
-#)
+spread_p.add_argument(
+    "datetime",
+    type=str,
+    help="game date",
+)
+
+spread_p.add_argument(
+    "away-team",
+    type=str,
+    help="away team",
+)
+
+spread_p.add_argument(
+    "away-vig",
+    type=float,
+    help="away vigorish",
+)
+
+spread_p.add_argument(
+    "home-team",
+    type=str,
+    help="home team",
+)
+
+spread_p.add_argument(
+    "home-vig",
+    type=float,
+    help="home vigorish",
+)
+
+spread_p.add_argument(
+    "home-spread",
+    type=float,
+    help="home point spread line",
+)
+
+total_p.add_argument(
+    "datetime",
+    type=str,
+    help="game date",
+)
+
+total_p.add_argument(
+    "away-team",
+    type=str,
+    help="away team",
+)
+
+total_p.add_argument(
+    "home-team",
+    type=str,
+    help="home team",
+)
+
+total_p.add_argument(
+    "over-vig",
+    type=float,
+    help="over vigorish",
+)
+
+total_p.add_argument(
+    "under-vig",
+    type=float,
+    help="under vigorish",
+)
+
+total_p.add_argument(
+    "total",
+    type=float,
+    help="game point total line",
+)
 
 args = parser.parse_args()
 kwargs = vars(args)
@@ -248,8 +301,10 @@ elif subparser == "predict":
 
     """
     datetime = str(np.datetime64(kwargs["datetime"], 's'))
-    away = kwargs["away"]
-    home = kwargs["home"]
+    away = kwargs["away-team"]
+    home = kwargs["home-team"]
+    spread_args = kwargs["spread"]
+    total_args = kwargs["total"]
 
     logging.info("{} {} at {}\n".format(datetime, away, home))
 
@@ -257,45 +312,105 @@ elif subparser == "predict":
     totals = model.MeloNFL.from_cache("total")
 
     win_prob_away = spreads.probability(datetime, away, home)
-    win_prob_fav, win_prob_undr = [
-        100*f(win_prob_away, 1 - win_prob_away)
-        for f in [max, min]
-    ]
+    win_prob_home = 1 - win_prob_away
 
-    favorite, underdog = (away, home) if win_prob_away > 0.5 else (home, away)
-
-    spread_away = spreads.median(datetime, away, home)
-    spread_fav, spread_undr = [
-        f(spread_away, -spread_away)
-        for f in [min, max]
-    ]
+    spread_home = spreads.median(datetime, away, home)
+    spread_away = -spread_home
 
     total = totals.median(datetime, away, home)
 
-    fav_score, undr_score = (
-        0.5*(total - spread_fav), 0.5*(total + spread_fav))
+    away_score, home_score = (
+        0.5*(total - spread_away), 0.5*(total + spread_away)
+    )
 
     report = pd.DataFrame({
-        "favorite": [
-            favorite,
-            "{:.0f}%".format(win_prob_fav),
-            "{:.1f}".format(spread_fav),
+        "away": [
+            away,
+            "{:.0f}%".format(100*win_prob_away),
+            "{:.1f}".format(spread_away),
             "{:.1f}".format(total),
-            "{:.0f}".format(round(fav_score)),
+            "{:.0f}".format(round(away_score)),
         ],
-        "underdog": [
-            underdog,
-            "{:.0f}%".format(win_prob_undr),
-            "{:.1f}".format(spread_undr),
+        "home": [
+            home,
+            "{:.0f}%".format(100*win_prob_home),
+            "{:.1f}".format(spread_home),
             "{:.1f}".format(total),
-            "{:.0f}".format(round(undr_score)),
+            "{:.0f}".format(round(home_score)),
         ],
     })
 
     row_labels = {0: "team", 1: "win prob", 2: "spread", 3: "total", 4: "score"}
     report.rename(index=row_labels, inplace=True)
 
-    print(report)
+    if spread_args is not None:
+        away_vig, home_vig, home_spread = spread_args
+        away_cover_prob = spreads.probability(datetime, away, home, lines=home_spread)
+        home_cover_prob = 1 - away_cover_prob
+
+        away_return = away_cover_prob*100 + (1 - away_cover_prob)*away_vig
+        away_return_rate = away_return / 100.
+
+        home_return = home_cover_prob*100 + (1 - home_cover_prob)*home_vig
+        home_return_rate = home_return / 100.
+
+        away_report = [
+            "{:.0f}%".format(100*away_cover_prob),
+            "{:.0f}%".format(100*away_return_rate),
+        ]
+
+        home_report = [
+            "{:.0f}%".format(100*home_cover_prob),
+            "{:.0f}%".format(100*home_return_rate),
+        ]
+
+        spread_report = pd.DataFrame({
+            "away": away_report,
+            "home": home_report,
+        })
+
+        row_labels = {0: "spread cover", 1: "spread return"}
+        spread_report.rename(index=row_labels, inplace=True)
+
+        report = pd.concat((report, spread_report))
+
+    if total_args is not None:
+        over_vig, under_vig, total = total_args
+        over_cover_prob = totals.probability(datetime, away, home, lines=total)
+        under_cover_prob = 1 - over_cover_prob
+
+        over_return = over_cover_prob*100 + (1 - over_cover_prob)*over_vig
+        over_return_rate = over_return / 100.
+
+        under_return = under_cover_prob*100 + (1 - under_cover_prob)*under_vig
+        under_return_rate = under_return / 100.
+
+        over_bet = [
+            "",
+            "over",
+            "{:.0f}%".format(100*over_cover_prob),
+            "{:.0f}%".format(100*over_return_rate),
+        ]
+
+        under_bet = [
+            "",
+            "under",
+            "{:.0f}%".format(100*under_cover_prob),
+            "{:.0f}%".format(100*under_return_rate),
+        ]
+
+        total_report = pd.DataFrame({
+            "away": over_bet,
+            "home": under_bet,
+        })
+
+        row_labels = {0: "", 1: "", 2: "cover prob", 3: "pred return"}
+        total_report.rename(index=row_labels, inplace=True)
+
+        report = pd.concat((report, total_report))
+
+    print(report, "\n")
+    print("*actual return rate lower than predicted")
 
 elif subparser == "rank":
     """
