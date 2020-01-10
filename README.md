@@ -86,6 +86,17 @@ The model can also rank teams by their expected performance against a league ave
 ```
 Additionally, you can validate the model predictions by calling
 ```
-nflmodel validate
+> nflmodel validate
+
+[INFO][validate] spread residual mean: 0.09
+[INFO][validate] spread residual mean absolute error: 10.38
+[INFO][validate] total residual mean: 0.17
+[INFO][validate] total residual mean absolute error: 10.69
+nflmodel validate  11.68s user 0.10s system 98% cpu 11.996 total
+
 ```
 which generates two figures, `validate_spread.pdf` and `validate_total.pdf`, visualizing the distribution of prediction residuals and quantiles.
+
+For example, the model's point spread residuals are perfectly normal and its quantiles sample a uniform normal distribution.
+
+![point spread validation](plots/validate_spread.png "MELO point spreads and totals")

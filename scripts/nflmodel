@@ -33,8 +33,6 @@ predict_p = subparsers.add_parser("predict")
 forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
-spread_p = subparsers.add_parser("spread")
-total_p = subparsers.add_parser("total")
 
 update_p.add_argument(
     "--rebuild",
@@ -118,78 +116,6 @@ rank_p.add_argument(
     type=str,
     help="datetime compatible string, e.g. 2020-01-01T01:00:00",
     default=str(now),
-)
-
-spread_p.add_argument(
-    "datetime",
-    type=str,
-    help="game date",
-)
-
-spread_p.add_argument(
-    "away-team",
-    type=str,
-    help="away team",
-)
-
-spread_p.add_argument(
-    "away-vig",
-    type=float,
-    help="away vigorish",
-)
-
-spread_p.add_argument(
-    "home-team",
-    type=str,
-    help="home team",
-)
-
-spread_p.add_argument(
-    "home-vig",
-    type=float,
-    help="home vigorish",
-)
-
-spread_p.add_argument(
-    "home-spread",
-    type=float,
-    help="home point spread line",
-)
-
-total_p.add_argument(
-    "datetime",
-    type=str,
-    help="game date",
-)
-
-total_p.add_argument(
-    "away-team",
-    type=str,
-    help="away team",
-)
-
-total_p.add_argument(
-    "home-team",
-    type=str,
-    help="home team",
-)
-
-total_p.add_argument(
-    "over-vig",
-    type=float,
-    help="over vigorish",
-)
-
-total_p.add_argument(
-    "under-vig",
-    type=float,
-    help="under vigorish",
-)
-
-total_p.add_argument(
-    "total",
-    type=float,
-    help="game point total line",
 )
 
 args = parser.parse_args()

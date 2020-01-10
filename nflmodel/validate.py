@@ -58,4 +58,4 @@ def assess_predictions(mode):
     axr.set_title("Quantiles")
 
     plt.tight_layout()
-    plt.savefig("validate_{}.pdf".format(mode))
+    plt.savefig("validate_{}.png".format(mode), dpi=200)
