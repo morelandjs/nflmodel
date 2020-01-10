@@ -25,7 +25,7 @@ Then train the model on the dataset (this will take a few minutes)
 ```
 Once trained, the model can forecast point spread and point total statistics for the upcoming week
 ```
-> nflmodel forecast
+> nflmodel forecast 2019 17
 
 [INFO][nflmodel] Forecast for season 2019 week 17
 
