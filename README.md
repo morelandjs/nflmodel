@@ -48,7 +48,6 @@ date
 2019-12-29     @SEA       SF      0.51    -0.6   50.8 
 
 *win probability and spread are for the favored team
-
 ```
 The model can also rank teams by their expected performance against a league average opponent
 ```
@@ -112,7 +111,6 @@ total cover     56%    44%
 total return     9%   -19% 
 
 *actual return rate lower than predicted
-
 ```
 
 Additionally, you can validate the model predictions by calling
@@ -123,7 +121,6 @@ Additionally, you can validate the model predictions by calling
 [INFO][validate] total residual mean: 0.17
 [INFO][validate] total residual mean absolute error: 10.69
 nflmodel validate  11.68s user 0.10s system 98% cpu 11.996 total
-
 ```
 which generates two figures, `validate_spread.pdf` and `validate_total.pdf`, visualizing the distribution of prediction residuals and quantiles.
 
