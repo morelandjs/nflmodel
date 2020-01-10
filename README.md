@@ -26,7 +26,6 @@ Then train the model on the dataset (this will take a few minutes)
 Once trained, the model can forecast point spread and point total statistics for the upcoming week
 ```
 > nflmodel forecast 2019 17
-
 [INFO][nflmodel] Forecast for season 2019 week 17
 
            favorite underdog  win prob  spread  total
@@ -54,7 +53,6 @@ date
 The model can also rank teams by their expected performance against a league average opponent
 ```
 > nflmodel rank
-
 [INFO][nflmodel] Rankings as of 2020-01-09T21:09:54
 
        win prob        spread         total
@@ -98,7 +96,6 @@ opponent on a neutral field
 And it can generate point spread and point total predictions for arbitrary matchups in the future...
 ```
 > nflmodel predict 2019-12-08 CLE BAL --spread -110 -115 -12 --total -110 -110 45                 
-
 [INFO][nflmodel] 2019-12-08T00:00:00 CLE at BAL
 
                away   home
@@ -121,7 +118,6 @@ total return     9%   -19%
 Additionally, you can validate the model predictions by calling
 ```
 > nflmodel validate
-
 [INFO][validate] spread residual mean: 0.09
 [INFO][validate] spread residual mean absolute error: 10.38
 [INFO][validate] total residual mean: 0.17
