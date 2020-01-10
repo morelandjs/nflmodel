@@ -9,7 +9,7 @@ Installation
 ------------
 
 ```
-git clone git@github.com:morelandjs/nfl-model.git && cd nfl-model
+git clone https://github.com/morelandjs/nfl-model.git && cd nfl-model
 pip install .
 ```
 
@@ -27,63 +27,97 @@ Once trained, the model can forecast point spread and point total statistics for
 ```
 > nflmodel forecast
 
+[INFO][nflmodel] Forecast for season 2019 week 17
+
            favorite underdog  win prob  spread  total
 date                                                 
-2019-11-24     @CLE      MIA      0.76   -13.1   43.2
-2019-11-24      @NE      DAL      0.78   -10.2   44.4
-2019-11-24      @NO      CAR      0.74    -8.7   49.7
-2019-11-24      @SF       GB      0.66    -7.5   49.2
-2019-11-24     @CHI      NYG      0.77    -6.9   46.1
-2019-11-24     @ATL       TB      0.71    -5.7   50.7
-2019-11-25      BAL      @LA      0.61    -5.2   48.1
-2019-11-24      PIT     @CIN      0.67    -4.3   41.8
-2019-11-21     @HOU      IND      0.67    -3.2   48.3
-2019-11-24     @BUF      DEN      0.63    -3.0   41.6
-2019-11-24      OAK     @NYJ      0.60    -2.8   46.4
-2019-11-24      SEA     @PHI      0.64    -2.4   49.6
-2019-11-24     @TEN      JAX      0.54    -2.1   45.0
-2019-11-24      DET     @WAS      0.51    -0.5   46.4
+2019-12-29      @NE      MIA      0.90   -17.1   43.3
+2019-12-29      @LA      ARI      0.70   -13.1   46.8
+2019-12-29     @DEN      OAK      0.73   -11.0   42.4
+2019-12-29     @BUF      NYJ      0.72   -10.8   40.4
+2019-12-29     @DAL      WAS      0.75    -9.3   46.9
+2019-12-29     @MIN      CHI      0.69    -9.1   34.5
+2019-12-29     @BAL      PIT      0.88    -9.1   42.9
+2019-12-29       NO     @CAR      0.78    -8.2   53.9
+2019-12-29       GB     @DET      0.83    -7.7   44.2
+2019-12-29      @KC      LAC      0.89    -7.3   43.9
+2019-12-29      PHI     @NYG      0.66    -5.9   49.1
+2019-12-29      CLE     @CIN      0.65    -4.0   45.2
+2019-12-29     @HOU      TEN      0.74    -3.4   47.7
+2019-12-29     @JAX      IND      0.54    -2.0   43.7
+2019-12-29      @TB      ATL      0.52    -1.4   51.4
+2019-12-29     @SEA       SF      0.51    -0.6   50.8 
+
+*win probability and spread are for the favored team
 
 ```
 The model can also rank teams by their expected performance against a league average opponent
 ```
 > nflmodel rank
 
-[INFO][nflmodel] Expected performance against a league average opponent
-   win rank  win prob spread rank  spread total rank  total
-1        NE      0.81          NE    11.3         TB   50.8
-2       BAL      0.81         BAL     9.8         KC   49.7
-3       SEA      0.77          SF     7.0        NYG   48.7
-4        SF      0.76          NO     6.1        BAL   48.6
-5        NO      0.75          LA     5.9        SEA   48.6
-6       MIN      0.71         MIN     5.7        ARI   48.2
-7       HOU      0.70         DAL     5.1        CAR   47.0
-8        GB      0.68          KC     4.1        DET   46.8
-9        LA      0.66         HOU     3.8         SF   46.3
-10       KC      0.65         SEA     3.8        OAK   46.2
-11      DAL      0.61          GB     3.1        DAL   46.2
-12      PHI      0.58         PHI     2.9         GB   46.2
-13      PIT      0.58         BUF     2.4        MIA   45.9
-14      CAR      0.58         LAC     2.1        PHI   45.9
-15      OAK      0.57         CHI     2.1        NYJ   45.7
-16      JAX      0.57         PIT     2.1        ATL   45.4
-17      BUF      0.56         ATL     1.4        HOU   45.3
-18      CLE      0.54         IND     1.2         NO   45.2
-19      IND      0.54         CAR     1.1        MIN   45.0
-20      TEN      0.54         JAX     1.1        CIN   44.6
-21      CHI      0.53         DEN     1.0         LA   44.6
-22      ATL      0.52         CLE     0.6        JAX   44.5
-23      DEN      0.50         DET    -1.5        TEN   44.4
-24      LAC      0.47         TEN    -1.6        CLE   44.2
-25      NYJ      0.40         ARI    -2.4        IND   44.0
-26      ARI      0.40          TB    -2.5        BUF   43.7
-27      DET      0.38         OAK    -2.6        PIT   43.5
-28       TB      0.38         NYJ    -3.4        WAS   43.5
-29      CIN      0.35         NYG    -3.8        DEN   43.4
-30      MIA      0.33         CIN    -3.9        LAC   42.9
-31      NYG      0.31         WAS    -5.6         NE   42.6
-32      WAS      0.30         MIA    -6.9        CHI   40.5 
+[INFO][nflmodel] Rankings as of 2020-01-09T21:09:54
+
+       win prob        spread         total
+rank                                       
+1      SF  0.78  │   NO  -8.1  │   TB  50.4
+2      NO  0.78  │   KC  -8.0  │  MIA  48.6
+3      KC  0.77  │  BAL  -7.4  │  NYG  48.3
+4      GB  0.75  │   NE  -7.1  │  CAR  48.3
+5     BAL  0.75  │   SF  -6.3  │   KC  48.2
+6      NE  0.68  │  DAL  -4.9  │   NO  47.9
+7     SEA  0.65  │   LA  -4.5  │   SF  47.4
+8      LA  0.63  │   GB  -3.6  │  BAL  47.3
+9     TEN  0.62  │  TEN  -3.0  │  ARI  47.2
+10    ATL  0.62  │  PHI  -2.9  │  SEA  47.0
+11    HOU  0.61  │  MIN  -2.9  │   LA  46.6
+12    PHI  0.61  │  ATL  -2.6  │  ATL  46.4
+13    DEN  0.61  │  SEA  -1.7  │  DET  46.2
+14    CHI  0.57  │  HOU  -1.3  │  DAL  46.2
+15    MIN  0.55  │  DEN  -1.1  │  HOU  46.2
+16    PIT  0.55  │  PIT  -0.9  │  CLE  46.1
+17    NYJ  0.52  │  CHI  -0.6  │  IND  45.9
+18    DAL  0.52  │   TB  -0.4  │  TEN  45.8
+19    BUF  0.48  │  BUF  -0.2  │  PHI  45.6
+20    JAX  0.47  │  LAC   0.5  │  CIN  45.3
+21     TB  0.47  │  IND   1.5  │  OAK  45.1
+22    ARI  0.44  │  ARI   1.6  │  WAS  45.0
+23    MIA  0.42  │  JAX   2.1  │  MIN  44.6
+24    OAK  0.41  │  NYJ   2.1  │  LAC  44.4
+25    IND  0.40  │  CLE   2.6  │   GB  44.4
+26    CLE  0.39  │  DET   3.0  │  JAX  44.1
+27    CAR  0.38  │  CAR   3.9  │  NYJ  43.5
+28    LAC  0.34  │  CIN   4.0  │   NE  43.2
+29    NYG  0.33  │  NYG   4.4  │  DEN  41.9
+30    DET  0.30  │  MIA   5.0  │  PIT  41.8
+31    CIN  0.30  │  OAK   5.5  │  BUF  41.1
+32    WAS  0.28  │  WAS   5.5  │  CHI  40.4 
+
+*expected performance against league average
+opponent on a neutral field
 ```
+And it can generate point spread and point total predictions for arbitrary matchups in the future...
+```
+> nflmodel predict 2019-12-08 CLE BAL --spread -110 -115 -12 --total -110 -110 45                 
+
+[INFO][nflmodel] 2019-12-08T00:00:00 CLE at BAL
+
+               away   home
+team            CLE    BAL
+win prob        12%    88%
+spread         13.7  -13.7
+total          47.4   47.4
+score            17     31
+spread cover    45%    55%
+spread return  -15%     3%
+                          
+               over  under
+total cover     56%    44%
+total return     9%   -19% 
+
+*actual return rate lower than predicted
+
+```
+
 Additionally, you can validate the model predictions by calling
 ```
 nflmodel validate
