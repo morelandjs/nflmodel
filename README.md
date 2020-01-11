@@ -3,7 +3,7 @@ NFL Model
 
 *NFL ratings and predictions*
 
-This package trains the margin-dependent Elo model (MELO) on NFL game data.
+This package trains the [margin-dependent Elo model (MELO)](https://github.com/morelandjs/melo) on NFL game data.
 
 Installation
 ------------
@@ -26,7 +26,6 @@ Then train the model on the dataset (this will take a few minutes)
 Once trained, the model can forecast point spread and point total statistics for the upcoming week
 ```
 > nflmodel forecast 2019 17
-
 [INFO][nflmodel] Forecast for season 2019 week 17
 
            favorite underdog  win prob  spread  total
@@ -49,12 +48,10 @@ date
 2019-12-29     @SEA       SF      0.51    -0.6   50.8 
 
 *win probability and spread are for the favored team
-
 ```
 The model can also rank teams by their expected performance against a league average opponent
 ```
 > nflmodel rank
-
 [INFO][nflmodel] Rankings as of 2020-01-09T21:09:54
 
        win prob        spread         total
@@ -98,7 +95,6 @@ opponent on a neutral field
 And it can generate point spread and point total predictions for arbitrary matchups in the future...
 ```
 > nflmodel predict 2019-12-08 CLE BAL --spread -110 -115 -12 --total -110 -110 45                 
-
 [INFO][nflmodel] 2019-12-08T00:00:00 CLE at BAL
 
                away   home
@@ -115,19 +111,16 @@ total cover     56%    44%
 total return     9%   -19% 
 
 *actual return rate lower than predicted
-
 ```
 
 Additionally, you can validate the model predictions by calling
 ```
 > nflmodel validate
-
 [INFO][validate] spread residual mean: 0.09
 [INFO][validate] spread residual mean absolute error: 10.38
 [INFO][validate] total residual mean: 0.17
 [INFO][validate] total residual mean absolute error: 10.69
 nflmodel validate  11.68s user 0.10s system 98% cpu 11.996 total
-
 ```
 which generates two figures, `validate_spread.pdf` and `validate_total.pdf`, visualizing the distribution of prediction residuals and quantiles.
 
