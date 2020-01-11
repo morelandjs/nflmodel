@@ -5,7 +5,7 @@ NFL Model
 
 This package trains the [margin-dependent Elo model (MELO)](https://github.com/morelandjs/melo) on NFL game data.
 
-Credit and thanks to Andrew Gallant for writing the nflgame Python package used to source NFL game data for this project.
+Credit and thanks to Andrew Gallant for writing the [nflgame](https://github.com/BurntSushi/nflgame) Python package used to source NFL game data for this project.
 
 Installation
 ------------
