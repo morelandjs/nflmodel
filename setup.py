@@ -9,7 +9,7 @@ setup(
     packages=['nflmodel'],
     scripts=['scripts/nflmodel'],
     install_requires=[
-        'hyperopt'
+        'hyperopt',
         'matplotlib',
         'melo @ git+https://git@github.com/morelandjs/melo.git@dev#egg=melo',
         'nflgame_redux @ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux',
