@@ -270,7 +270,10 @@ elif subparser == "predict":
     report.rename(index=row_labels, inplace=True)
 
     if spread_args is not None:
+        """
+        if specified, report point spread statistics
 
+        """
         away_vig, home_vig, home_spread = spread_args
         away_cover_prob = spreads.probability(datetime, away, home, lines=home_spread)
         home_cover_prob = 1 - away_cover_prob
@@ -302,7 +305,10 @@ elif subparser == "predict":
         report = pd.concat((report, spread_report))
 
     if total_args is not None:
+        """
+        if specified, report point total statistics
 
+        """
         over_vig, under_vig, total = total_args
         over_cover_prob = totals.probability(datetime, away, home, lines=total)
         under_cover_prob = 1 - over_cover_prob
@@ -338,6 +344,7 @@ elif subparser == "predict":
         report = pd.concat((report, total_report))
 
     print(report, "\n")
+
     print("*actual return rate lower than predicted")
 
 elif subparser == "rank":
