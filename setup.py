@@ -9,15 +9,14 @@ setup(
     packages=['nflmodel'],
     scripts=['scripts/nflmodel'],
     install_requires=[
-        'melo @ git+https://git@github.com/morelandjs/melo.git@dev#egg=melo',
-        'numpy',
+        'hyperopt'
         'matplotlib',
-        'scipy >= 0.18.0',
-        'joblib',
+        'melo @ git+https://git@github.com/morelandjs/melo.git@dev#egg=melo',
         'nflgame_redux @ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux',
+        'numpy',
         'pandas',
+        'scipy >= 0.18.0',
         'setuptools',
         'SQLAlchemy',
-        'hyperopt'
     ]
 )
