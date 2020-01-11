@@ -1,4 +1,4 @@
-*.sqlite
-*.pkl
+build/
+dist/
+*.egg-info/
 *.pyc
-*.pdf
