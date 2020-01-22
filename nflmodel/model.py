@@ -50,6 +50,8 @@ class MeloNFL(Melo):
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
         self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
 
+        self.games = self.games[:-256]
+
         # train the model
         self.train()
 
