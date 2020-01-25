@@ -6,6 +6,7 @@ import operator
 import os
 import pickle
 
+from ax import optimize
 from hyperopt import fmin, hp, tpe, Trials
 import matplotlib.pyplot as plt
 from melo import Melo
@@ -49,8 +50,6 @@ class MeloNFL(Melo):
         self.games = self.format_gamedata(load_games(update=False))
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
         self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
-
-        self.games = self.games[:-256]
 
         # train the model
         self.train()
@@ -281,7 +280,7 @@ class MeloNFL(Melo):
 
             return model
 
-        def objective(params):
+        def evaluation_function(params):
             return cls(mode, *params).mean_abs_error
 
         limits = {
@@ -301,6 +300,39 @@ class MeloNFL(Melo):
             ]
         }
 
+        #best_parameters, best_values, experiment, model = optimize(
+        #    parameters=[
+        #        {
+        #            "name": "kfactor",
+        #            "type": "range",
+        #            "bounds": [0.1, 0.4],
+        #        }, {
+        #            "name": "regress_coeff",
+        #            "type": "range",
+        #            "bounds": [0.1, 0.5],
+        #        }, {
+        #            "name": "rest_bonus",
+        #            "type": "range",
+        #            "bounds": [0.0, 0.5],
+        #        }, {
+        #            "name": "exp_bonus",
+        #            "type": "range",
+        #            "bounds": [-0.5, 0.0],
+        #        }, {
+        #            "name": "weight_qb",
+        #            "type": "range",
+        #            "bounds": [0.0, 1.0],
+        #        }
+        #    ],
+        #    evaluation_function=evaluation_function,
+        #    minimize=True,
+        #    total_trials=100,
+        #)
+
+        #print(best_parameters)
+        #print(best_values)
+        #quit()
+
         space = [hp.uniform(*lim) for lim in limits[mode]]
 
         trials = Trials()
@@ -309,8 +341,9 @@ class MeloNFL(Melo):
 
         load_games(update=True)
 
-        parameters = fmin(objective, space, algo=tpe.suggest, max_evals=steps,
-                          trials=trials, show_progressbar=False)
+        parameters = fmin(evaluation_function, space, algo=tpe.suggest,
+                          max_evals=steps, trials=trials,
+                          show_progressbar=False)
 
         model = cls(mode, **parameters)
 

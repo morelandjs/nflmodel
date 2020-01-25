@@ -8,6 +8,7 @@ setup(
     author_email='morelandjs@gmail.com',
     packages=['nflmodel'],
     scripts=['scripts/nflmodel'],
+    package_data={'nflmodel': ['data/betting_lines.csv']},
     install_requires=[
         'hyperopt',
         'matplotlib',

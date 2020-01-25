@@ -33,6 +33,7 @@ predict_p = subparsers.add_parser("predict")
 forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
+simulate_p = subparsers.add_parser("simulate")
 
 update_p.add_argument(
     "--rebuild",
@@ -406,6 +407,18 @@ elif subparser == "validate":
     """
     validate.assess_predictions("spread")
     validate.assess_predictions("total")
+
+elif subparser == "simulate":
+    """
+    Simulate betting strategy for regular seasons 2009–2019 which selects bets
+    based on a fixed decision threshold.
+
+    """
+    import pkgutil
+
+    pkgdata = pkgutil.get_data('nflmodel', 'data/betting_lines.csv')
+    print(pkgdata)
+
 
 else:
     raise ValueError("No such argument {}".format(subparser))
