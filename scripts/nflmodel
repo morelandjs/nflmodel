@@ -31,7 +31,6 @@ predict_p = subparsers.add_parser("predict")
 forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
-simulate_p = subparsers.add_parser("simulate-betting")
 
 update_p.add_argument(
     "--rebuild",
@@ -190,7 +189,8 @@ elif subparser == "forecast":
     try:
         games = nflgame.games(season, week=week)
     except TypeError:
-        sys.exit(f"cannot find schedule for forecast season {week}")
+        sys.exit("cannot find schedule for season {} week {}"\
+                 .format(season, week))
 
     logging.info("Forecast for season {} week {}\n".format(season, week))
 
@@ -424,32 +424,6 @@ elif subparser == "validate":
 
     validate.assess_predictions("spread")
     validate.assess_predictions("total")
-
-elif subparser == "simulate-betting":
-    """
-    Simulate betting strategy for regular seasons 2009–2019 which selects bets
-    based on a fixed decision threshold.
-
-    """
-    import pkgutil
-    from io import StringIO
-
-    from nflmodel import betting_simulator
-    import pandas as pd
-
-    pkgdata = pkgutil.get_data(
-        'nflmodel',
-        'data/betting_lines.csv'
-    ).decode("utf-8")
-
-    df_lines = pd.read_csv(StringIO(pkgdata))
-
-    bets = betting_simulator(threshold=threshold)
-
-    # TODO print bet numbers
-    print(df)
-
-    # TODO save bet
 
 else:
     raise ValueError("No such argument {}".format(subparser))

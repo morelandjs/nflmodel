@@ -43,7 +43,8 @@ def get_current_season_week():
     except requests.exceptions.ConnectionError:
         sys.exit("error: nflmodel requires an internet connection.")
 
+    # week is capped to week 17
     current_season = output["seasonId"]
-    current_week = output["week"]
+    current_week = min(output["week"], 17)
 
     return (current_season, current_week)
