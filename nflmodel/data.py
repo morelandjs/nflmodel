@@ -9,7 +9,7 @@ import nflgame
 import pandas as pd
 from sqlalchemy import create_engine
 
-from . import dbfile, now
+from . import dbfile, now, get_current_season_week
 
 
 def initialize_database(conn):
@@ -82,23 +82,6 @@ def starting_quarterbacks(game):
         return qb
 
     return (quarterback("home"), quarterback("away"))
-
-
-def get_current_season_week():
-    """
-    Returns current nfl season and week via the feeds-rs api call
-
-    For more api information visit http://www.nfl.com/feeds-rs?_wadl
-
-    """
-    url = "http://www.nfl.com/feeds-rs/currentWeek.json"
-    response = requests.get(url)
-    output = response.json()
-
-    current_season = output["seasonId"]
-    current_week = output["week"]
-
-    return (current_season, current_week)
 
 
 def update_database(conn, rebuild=False):

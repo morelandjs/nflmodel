@@ -6,7 +6,6 @@ import operator
 import os
 import pickle
 
-from ax import optimize
 from hyperopt import fmin, hp, tpe, Trials
 import matplotlib.pyplot as plt
 from melo import Melo
@@ -299,39 +298,6 @@ class MeloNFL(Melo):
                 ("weight_qb",     0.0, 1.0),
             ]
         }
-
-        #best_parameters, best_values, experiment, model = optimize(
-        #    parameters=[
-        #        {
-        #            "name": "kfactor",
-        #            "type": "range",
-        #            "bounds": [0.1, 0.4],
-        #        }, {
-        #            "name": "regress_coeff",
-        #            "type": "range",
-        #            "bounds": [0.1, 0.5],
-        #        }, {
-        #            "name": "rest_bonus",
-        #            "type": "range",
-        #            "bounds": [0.0, 0.5],
-        #        }, {
-        #            "name": "exp_bonus",
-        #            "type": "range",
-        #            "bounds": [-0.5, 0.0],
-        #        }, {
-        #            "name": "weight_qb",
-        #            "type": "range",
-        #            "bounds": [0.0, 1.0],
-        #        }
-        #    ],
-        #    evaluation_function=evaluation_function,
-        #    minimize=True,
-        #    total_trials=100,
-        #)
-
-        #print(best_parameters)
-        #print(best_values)
-        #quit()
 
         space = [hp.uniform(*lim) for lim in limits[mode]]
 

@@ -5,13 +5,10 @@ from datetime import datetime
 import logging
 import sys
 
-import numpy as np
-import pandas as pd
-
-from nflmodel import data, model, validate
+from nflmodel import get_current_season_week
 
 
-current_season, current_week = data.get_current_season_week()
+current_season, current_week = get_current_season_week()
 
 now = datetime.now()
 
@@ -24,6 +21,7 @@ parser = argparse.ArgumentParser(
 subparsers = parser.add_subparsers(
     dest="subparser",
     help="base functionality",
+    required=True,
 )
 
 update_p = subparsers.add_parser("update")
@@ -33,7 +31,7 @@ predict_p = subparsers.add_parser("predict")
 forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
-simulate_p = subparsers.add_parser("simulate")
+simulate_p = subparsers.add_parser("simulate-betting")
 
 update_p.add_argument(
     "--rebuild",
@@ -129,6 +127,8 @@ if subparser == "update":
     --rebuild to delete and rebuild the games database from scratch.
 
     """
+    from nflmodel import data
+
     rebuild = kwargs["rebuild"]
     data.load_games(update=True, rebuild=rebuild)
 
@@ -139,6 +139,9 @@ elif subparser == "games":
     rows printed.
 
     """
+    from nflmodel import data
+    import pandas as pd
+
     nhead = kwargs["head"]
     ntail = kwargs["tail"]
     games = data.load_games(update=False)
@@ -162,6 +165,8 @@ elif subparser == "calibrate":
     training iterations (default is 100 steps).
 
     """
+    from nflmodel import model
+
     steps = kwargs["steps"]
     for mode in ["spread", "total"]:
         model.MeloNFL.from_cache(mode, steps=steps, calibrate=True)
@@ -176,14 +181,18 @@ elif subparser == "forecast":
 
     """
     import nflgame
+    from nflmodel import model
+    import pandas as pd
+
+    season = kwargs["season"]
+    week = kwargs["week"]
 
     try:
-        games = nflgame.games(kwargs["season"], week=kwargs["week"])
+        games = nflgame.games(season, week=week)
     except TypeError:
-        sys.exit("cannot find schedule for specified forecast year")
+        sys.exit(f"cannot find schedule for forecast season {week}")
 
-    logging.info("Forecast for season {} week {}\n".format(
-        kwargs["season"], kwargs["week"]))
+    logging.info("Forecast for season {} week {}\n".format(season, week))
 
     def date(game):
         return '-'.join([game.eid[:4], game.eid[4:6], game.eid[6:8]])
@@ -227,7 +236,10 @@ elif subparser == "predict":
     Need not be an actual game on the schedule.
 
     """
-    datetime = str(np.datetime64(kwargs["datetime"], 's'))
+    from nflmodel import model
+    import pandas as pd
+
+    datetime = kwargs["datetime"]
     away = kwargs["away-team"]
     home = kwargs["home-team"]
     spread_args = kwargs["spread"]
@@ -354,7 +366,10 @@ elif subparser == "rank":
     available data preceding that moment in time.
 
     """
-    datetime = str(np.datetime64(kwargs["datetime"], 's'))
+    from nflmodel import model
+    import pandas as pd
+
+    datetime = kwargs["datetime"]
     logging.info("Rankings as of {}\n".format(datetime))
 
     spreads = model.MeloNFL.from_cache("spread")
@@ -405,20 +420,36 @@ elif subparser == "validate":
     and standardized residuals.
 
     """
+    from nflmodel import validate
+
     validate.assess_predictions("spread")
     validate.assess_predictions("total")
 
-elif subparser == "simulate":
+elif subparser == "simulate-betting":
     """
     Simulate betting strategy for regular seasons 2009–2019 which selects bets
     based on a fixed decision threshold.
 
     """
     import pkgutil
+    from io import StringIO
 
-    pkgdata = pkgutil.get_data('nflmodel', 'data/betting_lines.csv')
-    print(pkgdata)
+    from nflmodel import betting_simulator
+    import pandas as pd
 
+    pkgdata = pkgutil.get_data(
+        'nflmodel',
+        'data/betting_lines.csv'
+    ).decode("utf-8")
+
+    df_lines = pd.read_csv(StringIO(pkgdata))
+
+    bets = betting_simulator(threshold=threshold)
+
+    # TODO print bet numbers
+    print(df)
+
+    # TODO save bet
 
 else:
     raise ValueError("No such argument {}".format(subparser))
