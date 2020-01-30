@@ -11,6 +11,8 @@ from sqlalchemy import create_engine
 
 from . import dbfile, now, get_current_season_week
 
+print(dir(nflgame))
+
 
 def initialize_database(conn):
     """
