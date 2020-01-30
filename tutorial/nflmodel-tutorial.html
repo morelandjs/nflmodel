@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>nflmodel</title>
+<title>nflmodel-tutorial</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13111,7 +13111,7 @@ div#notebook {
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[27]:</div>
+<div class="prompt input_prompt">In&nbsp;[3]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>git clone https://github.com/morelandjs/nfl-model.git nflmodel
@@ -13133,14 +13133,78 @@ div#notebook {
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre>Cloning into &#39;nflmodel&#39;...
-remote: Enumerating objects: 199, done.
-remote: Counting objects: 100% (199/199), done.
-remote: Compressing objects: 100% (125/125), done.
-remote: Total 316 (delta 101), reused 146 (delta 59), pack-reused 117
-...
-Successfully built nflmodel
-Installing collected packages: nflmodel
-Successfully installed nflmodel-0.1
+remote: Enumerating objects: 230, done.
+remote: Counting objects: 100% (230/230), done.
+remote: Compressing objects: 100% (141/141), done.
+remote: Total 347 (delta 117), reused 172 (delta 69), pack-reused 117
+Receiving objects: 100% (347/347), 286.46 KiB | 263.00 KiB/s, done.
+Resolving deltas: 100% (164/164), done.
+Processing ./nflmodel
+Collecting hyperopt (from nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/7e/11/8bbbb5edb78c40a2bd0f6b730e3dc0f29ffbaea9a59520eb9622951e9151/hyperopt-0.2.3-py3-none-any.whl
+Collecting matplotlib (from nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/53/6c/7b400d45f0ecd6703b2779a7dfda6578579a353748e1b43d8353cb7f5b7f/matplotlib-3.1.2-cp38-cp38-manylinux1_x86_64.whl
+Collecting melo@ git+https://git@github.com/morelandjs/melo.git@dev#egg=melo from git+https://git@github.com/morelandjs/melo.git@dev#egg=melo (from nflmodel==0.1)
+  Cloning https://git@github.com/morelandjs/melo.git (to revision dev) to /tmp/pip-install-x_8a7h2t/melo
+  Running command git clone -q https://git@github.com/morelandjs/melo.git /tmp/pip-install-x_8a7h2t/melo
+  Running command git checkout -b dev --track origin/dev
+  Switched to a new branch &#39;dev&#39;
+  Branch &#39;dev&#39; set up to track remote branch &#39;dev&#39; from &#39;origin&#39;.
+Collecting nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux from git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux (from nflmodel==0.1)
+  Cloning https://git@github.com/morelandjs/nflgame.git (to revision master) to /tmp/pip-install-x_8a7h2t/nflgame-redux
+  Running command git clone -q https://git@github.com/morelandjs/nflgame.git /tmp/pip-install-x_8a7h2t/nflgame-redux
+Collecting numpy (from nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/41/38/b278d96baebc6a4818cfd9c0fb6f0e62013d5b87374bcf0f14a0e9b83ed5/numpy-1.18.1-cp38-cp38-manylinux1_x86_64.whl
+Collecting pandas (from nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/7b/fd/41698f20fd297cef2dc43a72a8ca42d149eaf7d954f1fb2bd3fc366a658d/pandas-0.25.3-cp38-cp38-manylinux1_x86_64.whl
+Collecting scipy&gt;=0.18.0 (from nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/f3/08/8bdcdcd149ea41b655956feb7c19ebf7e1f561738bd5570b6ae015daf411/scipy-1.4.1-cp38-cp38-manylinux1_x86_64.whl
+Requirement already satisfied: setuptools in ./.env/lib/python3.8/site-packages (from nflmodel==0.1) (41.2.0)
+Collecting SQLAlchemy (from nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/af/47/35edeb0f86c0b44934c05d961c893e223ef27e79e1f53b5e6f14820ff553/SQLAlchemy-1.3.13.tar.gz
+Collecting tqdm (from hyperopt-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/cc/2e/4307206db63f05ed37e21d4c0d843d0fbcacd62479f8ce99ba0f2c0875e0/tqdm-4.42.0-py2.py3-none-any.whl
+Collecting networkx==2.2 (from hyperopt-&gt;nflmodel==0.1)
+Collecting cloudpickle (from hyperopt-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/c1/49/334e279caa3231255725c8e860fa93e72083567625573421db8875846c14/cloudpickle-1.2.2-py2.py3-none-any.whl
+Collecting future (from hyperopt-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/45/0b/38b06fd9b92dc2b68d58b75f900e97884c45bedd2ff83203d933cf5851c9/future-0.18.2.tar.gz
+Requirement already satisfied: six in ./.env/lib/python3.8/site-packages (from hyperopt-&gt;nflmodel==0.1) (1.14.0)
+Requirement already satisfied: python-dateutil&gt;=2.1 in ./.env/lib/python3.8/site-packages (from matplotlib-&gt;nflmodel==0.1) (2.8.1)
+Collecting kiwisolver&gt;=1.0.1 (from matplotlib-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/64/8b/a70681c9a471f8187fed80d0aa9c9bb55ec3bf9daa50bd1cdc0c73d4910c/kiwisolver-1.1.0-cp38-cp38-manylinux1_x86_64.whl
+Collecting pyparsing!=2.0.4,!=2.1.2,!=2.1.6,&gt;=2.0.1 (from matplotlib-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/5d/bc/1e58593167fade7b544bfe9502a26dc860940a79ab306e651e7f13be68c2/pyparsing-2.4.6-py2.py3-none-any.whl
+Collecting cycler&gt;=0.10 (from matplotlib-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/f7/d2/e07d3ebb2bd7af696440ce7e754c59dd546ffe1bbe732c8ab68b9c834e61/cycler-0.10.0-py2.py3-none-any.whl
+Collecting pytz (from nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/e7/f9/f0b53f88060247251bf481fa6ea62cd0d25bf1b11a87888e53ce5b7c8ad2/pytz-2019.3-py2.py3-none-any.whl
+Collecting beautifulsoup4 (from nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/cb/a1/c698cf319e9cfed6b17376281bd0efc6bfc8465698f54170ef60a485ab5d/beautifulsoup4-4.8.2-py3-none-any.whl
+Collecting lxml (from nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/c0/a9/1fdadc1332a17a66f9074eccd364d548a5d5b6d7b624d683aadb45ed8b1b/lxml-4.5.0-cp38-cp38-manylinux1_x86_64.whl
+Collecting requests (from nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/51/bd/23c926cd341ea6b7dd0b2a00aba99ae0f828be89d72b2190f27c11d4b7fb/requests-2.22.0-py2.py3-none-any.whl
+Requirement already satisfied: decorator&gt;=4.3.0 in ./.env/lib/python3.8/site-packages (from networkx==2.2-&gt;hyperopt-&gt;nflmodel==0.1) (4.4.1)
+Collecting soupsieve&gt;=1.2 (from beautifulsoup4-&gt;nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/81/94/03c0f04471fc245d08d0a99f7946ac228ca98da4fa75796c507f61e688c2/soupsieve-1.9.5-py2.py3-none-any.whl
+Collecting certifi&gt;=2017.4.17 (from requests-&gt;nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/b9/63/df50cac98ea0d5b006c55a399c3bf1db9da7b5a24de7890bc9cfd5dd9e99/certifi-2019.11.28-py2.py3-none-any.whl
+Collecting urllib3!=1.25.0,!=1.25.1,&lt;1.26,&gt;=1.21.1 (from requests-&gt;nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/e8/74/6e4f91745020f967d09332bb2b8b9b10090957334692eb88ea4afe91b77f/urllib3-1.25.8-py2.py3-none-any.whl
+Collecting chardet&lt;3.1.0,&gt;=3.0.2 (from requests-&gt;nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/bc/a9/01ffebfb562e4274b6487b4bb1ddec7ca55ec7510b22e4c51f14098443b8/chardet-3.0.4-py2.py3-none-any.whl
+Collecting idna&lt;2.9,&gt;=2.5 (from requests-&gt;nflgame_redux@ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux-&gt;nflmodel==0.1)
+  Using cached https://files.pythonhosted.org/packages/14/2c/cd551d81dbe15200be1cf41cd03869a46fe7226e7450af7a6545bfc474c9/idna-2.8-py2.py3-none-any.whl
+Installing collected packages: numpy, tqdm, networkx, cloudpickle, future, scipy, hyperopt, kiwisolver, pyparsing, cycler, matplotlib, melo, pytz, soupsieve, beautifulsoup4, lxml, certifi, urllib3, chardet, idna, requests, nflgame-redux, pandas, SQLAlchemy, nflmodel
+  Running setup.py install for future ... done
+  Running setup.py install for melo ... done
+  Running setup.py install for nflgame-redux ... done
+  Running setup.py install for SQLAlchemy ... done
+  Running setup.py install for nflmodel ... done
+Successfully installed SQLAlchemy-1.3.13 beautifulsoup4-4.8.2 certifi-2019.11.28 chardet-3.0.4 cloudpickle-1.2.2 cycler-0.10.0 future-0.18.2 hyperopt-0.2.3 idna-2.8 kiwisolver-1.1.0 lxml-4.5.0 matplotlib-3.1.2 melo-1.1.0 networkx-2.2 nflgame-redux-2.0.1b1 nflmodel-0.1 numpy-1.18.1 pandas-0.25.3 pyparsing-2.4.6 pytz-2019.3 requests-2.22.0 scipy-1.4.1 soupsieve-1.9.5 tqdm-4.42.0 urllib3-1.25.8
+<span class="ansi-yellow-fg">WARNING: You are using pip version 19.2.3, however version 20.0.2 is available.
+You should consider upgrading via the &#39;pip install --upgrade pip&#39; command.</span>
 </pre>
 </div>
 </div>
@@ -13159,7 +13223,7 @@ Successfully installed nflmodel-0.1
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[28]:</div>
+<div class="prompt input_prompt">In&nbsp;[4]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel update
@@ -13179,10 +13243,10 @@ Successfully installed nflmodel-0.1
 
 
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][data] updating season 2009 week 1
-[INFO][data] updating season 2009 week 2
-...
-[INFO][data] updating season 2019 week 17
+<pre>Traceback (most recent call last):
+  File &#34;/home/morelandjs/.local/bin/nflmodel&#34;, line 8, in &lt;module&gt;
+    import numpy as np
+ModuleNotFoundError: No module named &#39;numpy&#39;
 </pre>
 </div>
 </div>
@@ -13202,44 +13266,13 @@ Successfully installed nflmodel-0.1
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[29]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel games
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>                datetime  season  week  ... team_away       qb_away  score_away
-0    2009-09-10 20:30:00    2009     1  ...       TEN     K.Collins          10
-1    2009-09-13 13:00:00    2009     1  ...       MIA  C.Pennington           7
-2    2009-09-13 13:00:00    2009     1  ...        KC      B.Croyle          24
-3    2009-09-13 13:00:00    2009     1  ...       PHI      D.McNabb          38
-4    2009-09-13 13:00:00    2009     1  ...       DEN       K.Orton          12
-...                  ...     ...   ...  ...       ...           ...         ...
-2811 2019-12-29 13:00:00    2019    17  ...       PHI       C.Wentz          34
-2812 2019-12-29 13:00:00    2019    17  ...       ATL        M.Ryan          28
-2813 2019-12-29 16:25:00    2019    17  ...       OAK        D.Carr          15
-2814 2019-12-29 16:25:00    2019    17  ...       ARI      K.Murray          24
-2815 2019-12-29 16:25:00    2019    17  ...        SF   J.Garoppolo          26
-
-[2816 rows x 9 columns]
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13274,36 +13307,13 @@ Successfully installed nflmodel-0.1
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[30]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel games --head <span class="m">3</span>
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>             datetime  season  week  ... team_away       qb_away  score_away
-0 2009-09-10 20:30:00    2009     1  ...       TEN     K.Collins          10
-1 2009-09-13 13:00:00    2009     1  ...       MIA  C.Pennington           7
-2 2009-09-13 13:00:00    2009     1  ...        KC      B.Croyle          24
-
-[3 rows x 9 columns]
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13335,46 +13345,13 @@ Successfully installed nflmodel-0.1
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[31]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel calibrate --steps <span class="m">200</span>
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][model] calibrating spread hyperparameters
-[INFO][data] updating season 2019 week 17
-[INFO][tpe] tpe_transform took 0.001760 seconds
-[INFO][tpe] TPE using 0 trials
-...
-[INFO][tpe] tpe_transform took 0.001731 seconds
-[INFO][tpe] TPE using 199/199 trials with best loss 10.373855
-[INFO][model] caching spread model to /home/morelandjs/.local/share/nflmodel/spread.pkl
-[INFO][model] calibrating total hyperparameters
-[INFO][data] updating season 2019 week 17
-[INFO][tpe] tpe_transform took 0.001551 seconds
-[INFO][tpe] TPE using 0 trials
-...
-[INFO][tpe] tpe_transform took 0.001817 seconds
-[INFO][tpe] TPE using 199/199 trials with best loss 10.694746
-[INFO][model] caching total model to /home/morelandjs/.local/share/nflmodel/total.pkl
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13398,49 +13375,13 @@ Successfully installed nflmodel-0.1
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[32]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel forecast <span class="m">2019</span> <span class="m">10</span>
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][nflmodel] Forecast for season 2019 week 10
-
-           favorite underdog  win prob  spread  total
-date                                                 
-2019-11-10      @NO      ATL      0.91    -9.9   47.6
-2019-11-10      BAL     @CIN      0.91    -9.2   45.7
-2019-11-10     @IND      MIA      0.71    -5.2   47.7
-2019-11-11      @SF      SEA      0.67    -4.4   48.9
-2019-11-10     @DAL      MIN      0.54    -3.0   45.0
-2019-11-10      BUF     @CLE      0.57    -2.8   42.0
-2019-11-10       KC     @TEN      0.58    -2.7   48.6
-2019-11-10     @CHI      DET      0.61    -1.8   44.7
-2019-11-07     @OAK      LAC      0.54    -1.7   43.2
-2019-11-10      @GB      CAR      0.53    -1.4   53.6
-2019-11-10     @NYJ      NYG      0.53    -1.3   46.9
-2019-11-10      ARI      @TB      0.53    -0.6   50.9
-2019-11-10       LA     @PIT      0.51    -0.3   44.9 
-
-*win probability and spread are for the favored team
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13464,69 +13405,13 @@ date
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[34]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel rank --datetime <span class="s2">&quot;2019-11-11T20:23:06&quot;</span>
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][nflmodel] Rankings as of 2019-11-11T20:23:06
-
-       win prob        spread         total
-rank                                       
-1     BAL  0.78  │  NE  -10.5  │   TB  50.1
-2      NE  0.77  │  BAL  -7.7  │   KC  50.1
-3     SEA  0.75  │   SF  -6.3  │  NYG  48.3
-4      SF  0.72  │  MIN  -5.8  │  BAL  48.0
-5      NO  0.71  │  HOU  -4.5  │  SEA  47.9
-6     HOU  0.69  │   LA  -4.5  │  CAR  47.6
-7     MIN  0.68  │  DAL  -4.2  │  ARI  46.8
-8      GB  0.67  │   NO  -4.1  │  ATL  46.7
-9     PIT  0.64  │  SEA  -3.2  │  OAK  46.6
-10    CAR  0.62  │  PIT  -3.0  │  PHI  46.5
-11    PHI  0.61  │   KC  -2.8  │  DET  46.4
-12     LA  0.60  │  PHI  -2.8  │   GB  46.0
-13     KC  0.57  │   GB  -2.6  │  HOU  45.9
-14    DAL  0.55  │  CAR  -2.5  │   SF  45.8
-15    OAK  0.54  │  LAC  -2.0  │  CIN  45.6
-16    CHI  0.54  │  CHI  -2.0  │   NO  45.5
-17    TEN  0.53  │  BUF  -0.7  │   LA  45.4
-18    JAX  0.51  │  JAX  -0.2  │  DAL  45.3
-19    BUF  0.50  │  DEN  -0.2  │  CLE  45.2
-20    DEN  0.48  │  CLE   1.1  │  NYJ  45.0
-21    LAC  0.48  │  ATL   1.2  │  IND  45.0
-22    CLE  0.47  │  IND   1.4  │  PIT  44.8
-23    ATL  0.43  │  TEN   1.4  │  MIA  44.8
-24    DET  0.41  │  DET   1.4  │  MIN  44.2
-25     TB  0.39  │   TB   1.7  │   NE  44.0
-26    ARI  0.38  │  OAK   3.0  │  LAC  43.4
-27    IND  0.38  │  ARI   3.1  │  JAX  43.0
-28    MIA  0.38  │  NYG   4.5  │  TEN  43.0
-29    NYJ  0.33  │  WAS   4.7  │  WAS  42.3
-30    WAS  0.33  │  CIN   4.8  │  BUF  42.2
-31    CIN  0.31  │  NYJ   5.4  │  CHI  41.7
-32    NYG  0.28  │  MIA   5.9  │  DEN  41.6 
-
-*expected performance against league average
-opponent on a neutral field
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13566,46 +13451,13 @@ opponent on a neutral field
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[35]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel predict <span class="s2">&quot;2019-12-01&quot;</span> CLE MIA --spread -110 -110 <span class="m">9</span>.5 --total -105 -115 <span class="m">46</span>.5
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][nflmodel] 2019-12-01T00:00:00 CLE at MIA
-
-                away   home
-team             CLE    MIA
-win prob         68%    32%
-spread         -12.6   12.6
-total           44.2   44.2
-score             28     16
-spread cover     59%    41%
-spread return    14%   -24%
-                           
-                over  under
-total cover      45%    55%
-total return    -13%     4% 
-
-*actual return rate lower than predicted
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13627,40 +13479,13 @@ total return    -13%     4%
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[36]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel predict <span class="s2">&quot;2019-12-01&quot;</span> CLE-B.Mayfield PHI-C.Wentz
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][nflmodel] 2019-12-01T00:00:00 CLE-B.Mayfield at PHI-C.Wentz
-
-                    away         home
-team      CLE-B.Mayfield  PHI-C.Wentz
-win prob             45%          55%
-spread               4.4         -4.4
-total               44.3         44.3
-score                 20           24 
-
-*actual return rate lower than predicted
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13675,40 +13500,13 @@ score                 20           24
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[37]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel predict <span class="s2">&quot;2019-12-01&quot;</span> CLE PHI
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][nflmodel] 2019-12-01T00:00:00 CLE at PHI
-
-          away  home
-team       CLE   PHI
-win prob   45%   55%
-spread     4.4  -4.4
-total     44.3  44.3
-score       20    24 
-
-*actual return rate lower than predicted
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13724,40 +13522,13 @@ score       20    24
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[38]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel predict <span class="s2">&quot;2019-12-01&quot;</span> CLE PHI-J.McCown
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][nflmodel] 2019-12-01T00:00:00 CLE at PHI-J.McCown
-
-          away          home
-team       CLE  PHI-J.McCown
-win prob   53%           47%
-spread    -2.8           2.8
-total     44.3          44.3
-score       24            21 
-
-*actual return rate lower than predicted
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13774,34 +13545,13 @@ score       24            21
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[39]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nflmodel validate
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[INFO][validate] spread residual mean: 0.08
-[INFO][validate] spread residual mean absolute error: 10.37
-[INFO][validate] total residual mean: 0.26
-[INFO][validate] total residual mean absolute error: 10.69
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 
@@ -13825,7 +13575,7 @@ score       24            21
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>The model's point spreads have a mean absolute error of 10.37 points and its point totals have a mean absolute error of 10.69 points. The table below compares the model's point spread mean absolute error to Vegas for the specific season range 2011–2018.</p>
+<p>The model's point spreads have a mean absolute error of 10.36 points and its point totals have a mean absolute error of 10.70 points. The table below compares the model's point spread mean absolute error to Vegas for the specific season range 2011–2019.</p>
 <table>
 <thead><tr>
 <th>MAE</th>
@@ -13836,18 +13586,60 @@ score       24            21
 <tbody>
 <tr>
 <td>MODEL</td>
-<td>10.35 pts</td>
-<td>10.67 pts</td>
+<td>10.36 pts</td>
+<td>10.70 pts</td>
 </tr>
 <tr>
 <td>VEGAS</td>
-<td>10.22 pts</td>
+<td>10.23 pts</td>
 <td>10.49 pts</td>
 </tr>
 </tbody>
 </table>
 <p>The model is less accurate than Vegas, but these numbers are still promising considering that many factors remain missing from the model such as weather and personnel changes.</p>
-<h4 id="Betting-simulation">Betting simulation<a class="anchor-link" href="#Betting-simulation">&#182;</a></h4>
+<h2 id="Betting-simulation">Betting simulation<a class="anchor-link" href="#Betting-simulation">&#182;</a></h2><p>I've also bundled a small script <code>nflmodel/tutorial/simulate-bets.py</code> inside the tutorial directory which can simulate the performance of the model as a betting tool on historical games. Hereafter, I restrict my attention to point spreads since I'm currently neglecting many factors which are specifically important to point total values like stadium type and weather.</p>
+<p>The general idea is as follows. I backtest the model and estimate the probability that the home team and away team each cover their Vegas spread (scraped from covers.com) at the moment just before kickoff. If the model believes that either team will cover their spread with a likelihood greater than X, where X is a fixed decision threshold, then I place a simulated bet on that team.</p>
+<p>When the threshold X=50%, the simulation places bets on every game, and when the threshold X ≫ 50%, the simulation is far more selective with the games it chooses to bet on. If I set the decision threshold X &gt; 90% then the model cannot find any games with sufficiently high confidence to bet on.</p>
+<p>In principle, one expects the model to get more bets correct when X is large because it is more confident in those bets. The goal here is to see if there is a threshold X which is sufficiently large to yield a positive ROI.</p>
+<p>Technically, I need more information to compute the model's ROI than just the historical spread. I also need the vigorish or "juice" on each spread which is the cut taken by the house in order to place a bet. Typically this ranges anywhere from -100 to -120 for spread bets, which means you might need to risk up to 120 dollars in order to win 100 dollars. More extreme vigs exist but they are uncommon.</p>
+<p>Unfortunately, <strong>I do not have the historical vigs for these lines</strong>, precluding a true ROI simulation. However, you can rest assured that the ROI will be strongly negative if the model is not getting more games right than wrong. So for now, let's just see if I can demonstrate that the model is better than 50-50 <em>with statistical significance</em>.</p>
+<p>Statistical significance here is key. As I increase the betting threshold, I reduce my validation statistics because the number of qualifying games drops. For large values of the threshold X, the model may only find a dozen or so qualifying games to bet on. This means the results of the simulation will be noisy and it will be possible to be duped by statistical fluctuations (we've all seen someone flip four heads in a row).</p>
+<p>To calculate statistical significance, I compute the 90% interquartile range for the null model, i.e. the range of reasonable outcomes for independent random wins sampled with 50% probability. In other words, I compare my model's success rate to what one would expect from random chance.</p>
+<p>The results of this calculation are shown below for a decision threshold X=0.75.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>python3 simulate-bets.py <span class="m">0</span>.75
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Here we see that the model is performing at the 90% quantile level, i.e. not something you'd use to bet a ton of money, but I think impressive nonetheless.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Who's-going-to-win-Super-Bowl-LIV?">Who's going to win Super Bowl LIV?<a class="anchor-link" href="#Who's-going-to-win-Super-Bowl-LIV?">&#182;</a></h2><p>Unfortunately, I have not prepped the model to work on the post-season yet. There's nothing that precludes applying the model to the post-season, it just involves some more work, and I haven't had time to do it yet.</p>
+<p>In any event, I think this tutorial shows that the Vegas lines are quite accurate, and it is non-trivial to build a model that beats them. The small number of available games makes NFL modeling a uniquely interesting problem, and I've learned quite a bit on my own quest to build a better model.</p>
+<p>Please feel free to contact me at morelandjs@gmail.com with questions and comments.</p>
+<p>Thank you!</p>
+<p>-Scott</p>
+
 </div>
 </div>
 </div>
