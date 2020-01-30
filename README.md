@@ -128,4 +128,4 @@ which generates two figures, `validate_spread.pdf` and `validate_total.pdf`, vis
 
 For example, the model's point spread residuals are perfectly normal and its quantiles sample a uniform normal distribution.
 
-![point spread validation](plots/validate_spread.png "MELO point spreads and totals")
+![point spread validation](tutorial/validate_spread.png "MELO point spreads and totals")
