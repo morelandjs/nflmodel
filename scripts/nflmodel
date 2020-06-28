@@ -5,10 +5,8 @@ from datetime import datetime
 import logging
 import sys
 
-from nflmodel import get_current_season_week
 
-
-current_season, current_week = get_current_season_week()
+current_season, current_week = 2020, 1
 
 now = datetime.now()
 
@@ -24,19 +22,12 @@ subparsers = parser.add_subparsers(
     required=True,
 )
 
-update_p = subparsers.add_parser("update")
 games_p = subparsers.add_parser("games")
 calibrate_p = subparsers.add_parser("calibrate")
 predict_p = subparsers.add_parser("predict")
 forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
-
-update_p.add_argument(
-    "--rebuild",
-    action="store_true",
-    help="rebuild game data from scratch",
-)
 
 games_p.add_argument(
     "--head",
@@ -120,30 +111,20 @@ args = parser.parse_args()
 kwargs = vars(args)
 subparser = kwargs.pop("subparser")
 
-if subparser == "update":
-    """
-    Refreshes the current games database. Optionally, provide flag
-    --rebuild to delete and rebuild the games database from scratch.
 
-    """
-    from nflmodel import data
-
-    rebuild = kwargs["rebuild"]
-    data.load_games(update=True, rebuild=rebuild)
-
-elif subparser == "games":
+if subparser == "games":
     """
     Prints a subset of the games database to standard out.
     Arguments --head and --tail can be used to increase the maximum number of
     rows printed.
 
     """
-    from nflmodel import data
+    from armchair_analysis.game_data import game_data
     import pandas as pd
 
     nhead = kwargs["head"]
     ntail = kwargs["tail"]
-    games = data.load_games(update=False)
+    games = game_data.dataframe
 
     if nhead == -1 and ntail == -1:
         print(games)
@@ -168,7 +149,7 @@ elif subparser == "calibrate":
 
     steps = kwargs["steps"]
     for mode in ["spread", "total"]:
-        model.MeloNFL.from_cache(mode, steps=steps, calibrate=True)
+        model.EloraNFL.from_cache(mode, steps=steps, calibrate=True)
 
 elif subparser == "forecast":
     """
@@ -202,16 +183,16 @@ elif subparser == "forecast":
         columns=["date", "away", "home"]
     )
 
-    spreads = model.MeloNFL.from_cache("spread", calibrate=False)
-    totals = model.MeloNFL.from_cache("total", calibrate=False)
+    spreads = model.EloraNFL.from_cache("spread", calibrate=False)
+    totals = model.EloraNFL.from_cache("total", calibrate=False)
 
     report = pd.DataFrame({
         "date": games.date,
         "favorite": games.away,
         "underdog": "@" + games.home,
-        "win prob": spreads.probability(games.date, games.away, games.home),
-        "spread": spreads.median(games.date, games.away, games.home),
-        "total": totals.median(games.date, games.away, games.home),
+        "win prob": spreads.sf(0, games.date, games.away, games.home),
+        "spread": spreads.mean(games.date, games.away, games.home),
+        "total": totals.mean(games.date, games.away, games.home),
     }).set_index("date")
 
     report[["favorite", "underdog"]] = report[["underdog", "favorite"]].where(
@@ -247,16 +228,16 @@ elif subparser == "predict":
 
     logging.info("{} {} at {}\n".format(datetime, away, home))
 
-    spreads = model.MeloNFL.from_cache("spread")
-    totals = model.MeloNFL.from_cache("total")
+    spreads = model.EloraNFL.from_cache("spread")
+    totals = model.EloraNFL.from_cache("total")
 
-    win_prob_away = spreads.probability(datetime, away, home)
+    win_prob_away = spreads.sf(0, datetime, away, home)
     win_prob_home = 1 - win_prob_away
 
-    spread_home = spreads.median(datetime, away, home)
+    spread_home = spreads.mean(datetime, away, home)
     spread_away = -spread_home
 
-    total = totals.median(datetime, away, home)
+    total = totals.mean(datetime, away, home)
 
     away_score, home_score = (
         0.5*(total - spread_away), 0.5*(total + spread_away)
@@ -288,7 +269,7 @@ elif subparser == "predict":
 
         """
         away_vig, home_vig, home_spread = spread_args
-        away_cover_prob = spreads.probability(datetime, away, home, lines=home_spread)
+        away_cover_prob = spreads.sf(0, datetime, away, home, lines=home_spread)
         home_cover_prob = 1 - away_cover_prob
 
         away_return = away_cover_prob*100 + (1 - away_cover_prob)*away_vig
@@ -323,7 +304,7 @@ elif subparser == "predict":
 
         """
         over_vig, under_vig, total = total_args
-        over_cover_prob = totals.probability(datetime, away, home, lines=total)
+        over_cover_prob = totals.sf(0, datetime, away, home, lines=total)
         under_cover_prob = 1 - over_cover_prob
 
         over_return = over_cover_prob*100 + (1 - over_cover_prob)*over_vig
@@ -372,11 +353,11 @@ elif subparser == "rank":
     datetime = kwargs["datetime"]
     logging.info("Rankings as of {}\n".format(datetime))
 
-    spreads = model.MeloNFL.from_cache("spread")
-    totals = model.MeloNFL.from_cache("total")
+    spreads = model.EloraNFL.from_cache("spread")
+    totals = model.EloraNFL.from_cache("total")
 
     df = pd.DataFrame(
-        spreads.rank(datetime, statistic="win"),
+        spreads.rank(datetime, order_by="win prob", reverse=True),
         columns=["team", "win prob"],
     )
 
@@ -384,17 +365,15 @@ elif subparser == "rank":
     col1 = df["team"] + "  " + df["win prob"]
 
     df = pd.DataFrame(
-        spreads.rank(datetime, statistic="mean"),
+        spreads.rank(datetime, order_by="mean", reverse=True),
         columns=["team", "point spread"],
     ).round(decimals=1)
-
-    df["point spread"] *= -1
 
     df["point spread"] = df[["point spread"]].applymap("{:4.1f}".format)
     col2 = df["team"] + "  " + df["point spread"]
 
     df = pd.DataFrame(
-        totals.rank(datetime),
+        totals.rank(datetime, order_by="mean", reverse=True),
         columns=["team", "point total"],
     ).round(decimals=1)
 

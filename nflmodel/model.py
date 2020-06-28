@@ -1,37 +1,32 @@
 """Trains model and exposes predictor class objects"""
-
-from datetime import datetime
+from functools import partial
 import logging
 import operator
-import os
 import pickle
 
+from armchair_analysis.game_data import game_data
+from elora import Elora
 from hyperopt import fmin, hp, tpe, Trials
 import matplotlib.pyplot as plt
-from melo import Melo
 import numpy as np
 import pandas as pd
 
-from .data import load_games, update_model
 from . import cachedir
 
 
-class MeloNFL(Melo):
+class EloraNFL(Elora):
     """
     Generate NFL point-spread or point-total predictions
-    using the Margin-dependent Elo (MELO) model.
+    using the Elo regressor algorithm (elora)
 
     """
-    def __init__(self, mode, kfactor, regress_coeff,
-                 rest_bonus, exp_bonus, weight_qb, burnin=512):
+    def __init__(self, mode, kfactor, regress_frac, scale=13, burnin=512):
 
         # hyperparameters
         self.mode = mode
         self.kfactor = kfactor
-        self.regress_coeff = regress_coeff
-        self.rest_bonus = rest_bonus
-        self.exp_bonus = exp_bonus
-        self.weight_qb = weight_qb
+        self.regress_frac = regress_frac
+        self.scale = scale
         self.burnin = burnin
 
         # model operation mode: "spread" or "total"
@@ -40,15 +35,14 @@ class MeloNFL(Melo):
                 "Unknown mode; valid options are 'spread' and 'total'")
 
         # mode-specific training hyperparameters
-        self.commutes, self.compare, self.lines = {
-            "total": (True, operator.add, np.arange(-0.5, 111.5)),
-            "spread": (False, operator.sub, np.arange(-59.5, 60.5)),
+        self.commutes, self.compare = {
+            "total": (True, operator.add),
+            "spread": (False, operator.sub),
         }[mode]
 
         # pre-process training data
-        self.games = self.format_gamedata(load_games(update=False))
+        self.games = self.format_gamedata(game_data.dataframe)
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
-        self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
 
         # train the model
         self.train()
@@ -58,48 +52,33 @@ class MeloNFL(Melo):
         self.mean_abs_error = np.mean(np.abs(self.residuals_[burnin:]))
         self.rms_error = np.sqrt(np.mean(self.residuals_[burnin:]**2))
 
-    def regress(self, months):
+        # components for binary cross entropy loss
+        #y = self.examples.value > self.mean_value
+        #tiny = 1e-5
+        #yp = np.clip(
+        #    self.sf(
+        #        self.mean_value,
+        #        self.examples.time,
+        #        self.examples.label1,
+        #        self.examples.label2,
+        #        self.examples.bias),
+        #    tiny, 1 - tiny)
+
+        # binary cross entropy loss
+        #self.log_loss = -np.mean(y*np.log(yp) + (1 - y)*np.log(1 - yp))
+
+    def regression_coeff(self, elapsed_time):
         """
         Regress ratings to the mean as a function of elapsed time.
 
-        Regression fraction equals self.regress_coeff if months > 3, else 0.
+        Regression fraction equals:
+
+            self.regress_frac if elapsed_days > 90, else 1
 
         """
-        return self.regress_coeff if months > 3 else 0
+        elapsed_months = elapsed_time / np.timedelta64(1, 'D')
 
-    def bias(self, games):
-        """
-        Circumstantial bias correction factor for each game.
-
-        The bias factor includes two terms: a rest factor which compares the
-        rest of each team, and an experience factor which compares the
-        experience of each quarterback.
-
-        """
-        rest_level_away = 1 - np.exp(-games.rest_days_away / 5.)
-        rest_level_home = 1 - np.exp(-games.rest_days_home / 5.)
-
-        rest_bias = self.rest_bonus * self.compare(
-            rest_level_away,
-            rest_level_home,
-        )
-
-        exp_level_away = 1 - np.exp(-games.exp_away / 7.)
-        exp_level_home = 1 - np.exp(-games.exp_home / 7.)
-
-        exp_bias = self.exp_bonus * self.compare(
-            exp_level_away,
-            exp_level_home,
-        )
-
-        return rest_bias + exp_bias
-
-    def combine(self, team_rating, qb_rating):
-        """
-        Combines team and quarterback ratings to form a single rating
-
-        """
-        return (1 - self.weight_qb)*team_rating + self.weight_qb*qb_rating
+        return self.regress_frac if elapsed_months > 90 else 1
 
     def format_gamedata(self, games):
         """
@@ -118,7 +97,7 @@ class MeloNFL(Melo):
 
         """
         # sort games by date
-        games = games.sort_values(by=["datetime", "team_home"])
+        games = games.sort_values(by=["date", "team_home"])
 
         # give jacksonville jaguars a single name
         games.replace("JAC", "JAX", inplace=True)
@@ -129,66 +108,39 @@ class MeloNFL(Melo):
 
         # game dates for every team
         game_dates = pd.concat([
-            games[["datetime", "team_home"]].rename(
+            games[["date", "team_home"]].rename(
                 columns={"team_home": "team"}),
-            games[["datetime", "team_away"]].rename(
+            games[["date", "team_away"]].rename(
                 columns={"team_away": "team"}),
-        ]).sort_values("datetime")
-
-        # create home and away label columns
-        games["home"] = games["team_home"] + '-' + games["qb_home"]
-        games["away"] = games["team_away"] + '-' + games["qb_away"]
+        ]).sort_values("date")
 
         # game dates for every team
         game_dates = pd.concat([
-            games[["datetime", "team_home"]].rename(
+            games[["date", "team_home"]].rename(
                 columns={"team_home": "team"}),
-            games[["datetime", "team_away"]].rename(
+            games[["date", "team_away"]].rename(
                 columns={"team_away": "team"}),
-        ]).sort_values("datetime")
+        ]).sort_values("date")
 
         # compute days rested
         for team in ["home", "away"]:
             games_prev = game_dates.rename(
                 columns={"team": "team_{}".format(team)})
 
-            games_prev["date_{}_prev".format(team)] = games.datetime
+            games_prev["date_{}_prev".format(team)] = games.date
 
             games = pd.merge_asof(
                 games, games_prev,
-                on="datetime", by="team_{}".format(team),
+                on="date", by="team_{}".format(team),
                 allow_exact_matches=False
             )
 
         # days rested since last game
         one_day = pd.Timedelta("1 days")
-        games["rest_days_home"] = \
-            (games.datetime - games.date_home_prev) / one_day
-        games["rest_days_away"] = \
-            (games.datetime - games.date_away_prev) / one_day
-
-        # set days rested to 7 at beginning of the season (default)
-        games["rest_days_home"] = games["rest_days_home"].where(
-            games.week > 1, other=7)
-        games["rest_days_away"] = games["rest_days_away"].where(
-            games.week > 1, other=7)
-
-        # games played by each qb
-        qb_home = games[["datetime", "qb_home"]].rename(
-            columns={"qb_home": "qb"})
-        qb_away = games[["datetime", "qb_away"]].rename(
-            columns={"qb_away": "qb"})
-
-        qb_exp = pd.concat([qb_home, qb_away]).sort_values("datetime")
-        qb_exp["exp"] = qb_exp.groupby("qb").cumcount()
-
-        for team in ["home", "away"]:
-            games = games.merge(
-                qb_exp.rename(columns={
-                    "qb": "qb_{}".format(team),
-                    "exp": "exp_{}".format(team)
-                }), on=["datetime", "qb_{}".format(team)],
-            )
+        games["rest_days_home"] = np.clip(
+            (games.date - games.date_home_prev) / one_day, 3, 16).fillna(7)
+        games["rest_days_away"] = np.clip(
+            (games.date - games.date_away_prev) / one_day, 3, 16).fillna(7)
 
         return games
 
@@ -197,23 +149,18 @@ class MeloNFL(Melo):
         Trains the Margin Elo (MELO) model on the historical game data.
 
         """
-        # instantiate the Melo base class
-        super(MeloNFL, self).__init__(
-            self.kfactor, lines=self.lines, sigma=1.0,
-            regress=self.regress, regress_unit="month",
-            commutes=self.commutes, combine=self.combine)
+        super(EloraNFL, self).__init__(
+            self.kfactor,
+            scale=self.scale,
+            commutes=self.commutes)
 
-        # train the model
         self.fit(
-            self.games.datetime,
-            self.games.away,
-            self.games.home,
+            self.games.date,
+            self.games.team_away,
+            self.games.team_home,
             self.compare(
-                self.games.score_away,
-                self.games.score_home,
-            ),
-            self.bias(self.games)
-        )
+                self.games.tm_pts_away,
+                self.games.tm_pts_home))
 
     def visualize_hyperopt(mode, trials, parameters):
         """
@@ -226,7 +173,7 @@ class MeloNFL(Melo):
             plotdir.mkdir()
 
         fig, axes = plt.subplots(
-            ncols=5, figsize=(12, 3), sharey=True)
+            ncols=2, figsize=(12, 3), sharey=True)
 
         losses = trials.losses()
 
@@ -244,18 +191,40 @@ class MeloNFL(Melo):
         plt.tight_layout()
         plt.savefig(str(plotfile))
 
-    def rank(self, time, statistic="mean"):
+    def rank(self, time, order_by='mean', reverse=False):
         """
-        Modify melo ranking function to only consider teams (ignore qbs).
+        Rank labels at specified 'time' according to 'order_by'
+        comparison value.
+
+        Args:
+            time (np.datetime64): time to compute the ranking
+            order_by (string, optional): options are 'mean' and 'win_prob'
+                (default is 'mean')
+            reverse (bool, optional): reverses the ranking order if true
+                (default is False)
+
+        Returns:
+            ranked_labels (list of tuple): list of (label, value) pairs
 
         """
-        return super(MeloNFL, self).rank(
-            time, labels=self.teams, statistic=statistic)
+        value = {
+            "win prob": partial(self.sf, 0),
+            "mean": self.mean,
+         }.get(order_by, None)
+
+        if value is None:
+            raise ValueError("no such comparison function")
+
+        ranked_list = [
+            (label, value(time, label, None, biases=-self.commutator))
+            for label in self.labels]
+
+        return sorted(ranked_list, key=lambda v: v[1], reverse=reverse)
 
     @classmethod
     def from_cache(cls, mode, steps=100, calibrate=False):
         """
-        Optimizes the MeloNFL model hyper parameters. Returns cached values
+        Optimizes the EloraNFL model hyper parameters. Returns cached values
         if calibrate is False and the parameters are cached, otherwise it
         optimizes the parameters and saves them to the cache.
 
@@ -263,49 +232,25 @@ class MeloNFL(Melo):
         cachefile = cachedir / "{}.pkl".format(mode)
 
         if not calibrate and cachefile.exists():
-            cache_timestamp = datetime.fromtimestamp(
-                os.path.getmtime(cachefile))
-
-            model = pickle.load(cachefile.open(mode="rb"))
-
-            if update_model(cache_timestamp):
-                logging.info("updating model")
-                load_games(update=True)
-                model.train()
-
-                logging.info("caching {} model to {}".format(mode, cachefile))
-                pickle.dump(model, cachefile.open(mode="wb"),
-                            protocol=pickle.HIGHEST_PROTOCOL)
-
-            return model
+            return pickle.load(cachefile.open(mode="rb"))
 
         def evaluation_function(params):
             return cls(mode, *params).mean_abs_error
 
         limits = {
             "spread": [
-                ("kfactor",       0.1,  0.4),
-                ("regress_coeff", 0.1,  0.5),
-                ("rest_bonus",    0.0,  0.5),
-                ("exp_bonus",     0.0,  0.5),
-                ("weight_qb",     0.0,  1.0),
+                ("kfactor",     0.02, 0.12),
+                ("regress_frac", 0.0,  1.0),
             ],
             "total": [
-                ("kfactor",       0.0, 0.3),
-                ("regress_coeff", 0.0, 0.5),
-                ("rest_bonus",   -0.5, 0.0),
-                ("exp_bonus",     0.1, 0.4),
-                ("weight_qb",     0.0, 1.0),
-            ]
-        }
+                ("kfactor",      0.01, 0.07),
+                ("regress_frac",  0.0, 1.0)]}
 
         space = [hp.uniform(*lim) for lim in limits[mode]]
 
         trials = Trials()
 
         logging.info("calibrating {} hyperparameters".format(mode))
-
-        load_games(update=True)
 
         parameters = fmin(evaluation_function, space, algo=tpe.suggest,
                           max_evals=steps, trials=trials,
@@ -322,3 +267,15 @@ class MeloNFL(Melo):
             pickle.dump(model, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         return model
+
+
+if __name__ == '__main__':
+
+    spreads = EloraNFL.from_cache('spread', calibrate=False)
+    games = spreads.games
+
+    spread_pred = spreads.mean(games.date, games.team_away, games.team_home)
+    spread_vegas = -games.spread_vegas
+
+    plt.plot(spread_pred, spread_vegas, 'o')
+    plt.show()
