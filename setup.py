@@ -11,12 +11,10 @@ setup(
     install_requires=[
         'hyperopt',
         'matplotlib',
-        'melo @ git+https://git@github.com/morelandjs/melo.git@dev#egg=melo',
-        'nflgame_redux @ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux',
+        'melo @ git+https://github.com/morelandjs/elora.git@master#egg=elora'
         'numpy',
         'pandas',
         'scipy >= 0.18.0',
         'setuptools',
-        'SQLAlchemy',
     ]
 )

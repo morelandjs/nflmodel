@@ -46,7 +46,14 @@ def assess_predictions(mode):
     axl.set_title("Standardized residuals")
 
     # quantiles
-    quantiles = nfl_model.quantiles()[256:]
+    quantiles = nfl_model.sf(
+        nfl_model.examples.value,
+        nfl_model.examples.time,
+        nfl_model.examples.label1,
+        nfl_model.examples.label2,
+        nfl_model.examples.bias
+    )[nfl_model.burnin:]
+
     axr.axhline(1, color="black")
     axr.hist(quantiles, bins=20, histtype="step", density=True)
 

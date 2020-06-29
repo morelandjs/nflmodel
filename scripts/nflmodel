@@ -12,100 +12,53 @@ now = datetime.now()
 
 parser = argparse.ArgumentParser(
     description="\n".join([
-        "NFL ratings and predictions. Points spreads use Vegas sign convention.",
-    ]), formatter_class=argparse.RawTextHelpFormatter
-)
+        "NFL ratings and predictions from the Elo regressor algorithm"]),
+    formatter_class=argparse.RawTextHelpFormatter)
 
 subparsers = parser.add_subparsers(
-    dest="subparser",
-    help="base functionality",
-    required=True,
-)
+    dest="subparser", help="base functionality", required=True)
 
 games_p = subparsers.add_parser("games")
 calibrate_p = subparsers.add_parser("calibrate")
 predict_p = subparsers.add_parser("predict")
-forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
 
 games_p.add_argument(
-    "--head",
-    type=int,
-    default=-1,
-    help="Print the first HEAD database games to standard output.",
-)
+    "--head", type=int, default=-1,
+    help="Print the first HEAD database games to standard output.")
 
 games_p.add_argument(
-    "--tail",
-    type=int,
-    default=-1,
-    help="Print the last TAIL database games to standard output.",
-)
+    "--tail", type=int, default=-1,
+    help="Print the last TAIL database games to standard output.")
 
 calibrate_p.add_argument(
-    "--steps",
-    default=100,
-    type=int,
-    help="number of calibration steps",
-)
+    "--steps", default=100, type=int,
+    help="number of calibration steps")
 
 predict_p.add_argument(
-    "datetime",
-    type=str,
-    help="datetime compatible string, e.g. 2020-01-01T01:00:00",
-)
+    "datetime", type=str,
+    help="datetime compatible string, e.g. 2020-01-01T01:00:00")
 
 predict_p.add_argument(
-    "away-team",
-    type=str,
-    help="away team",
-)
+    "away-team", type=str,
+    help="away team")
 
 predict_p.add_argument(
-    "home-team",
-    type=str,
-    help="home team",
-)
+    "home-team", type=str,
+    help="home team")
 
 predict_p.add_argument(
-    "--spread",
-    type=float,
-    nargs=3,
-    metavar="float",
-    help="away vig, home vig, home point spread",
-)
+    "--spread", type=float, nargs=3, metavar="float",
+    help="away vig, home vig, home point spread")
 
 predict_p.add_argument(
-    "--total",
-    type=float,
-    nargs=3,
-    metavar="float",
-    help="over vig, under vig, point total",
-)
-
-forecast_p.add_argument(
-    "season",
-    type=int,
-    nargs='?',
-    help="season year; default is current season",
-    default=current_season,
-)
-
-forecast_p.add_argument(
-    "week",
-    type=int,
-    nargs='?',
-    help="season week; default is current week",
-    default=current_week,
-)
+    "--total", type=float, nargs=3, metavar="float",
+    help="over vig, under vig, point total")
 
 rank_p.add_argument(
-    "--datetime",
-    type=str,
-    help="datetime compatible string, e.g. 2020-01-01T01:00:00",
-    default=str(now),
-)
+    "--datetime", type=str, default=str(now),
+    help="datetime compatible string, e.g. 2020-01-01T01:00:00")
 
 args = parser.parse_args()
 kwargs = vars(args)
@@ -136,11 +89,12 @@ if subparser == "games":
         print(games.tail(ntail))
     else:
         sys.exit(
-            f"error: invalid argument combination --head {nhead} --tail {ntail}")
+            f"error: invalid argument combination "
+            "--head {nhead} --tail {ntail}")
 
 elif subparser == "calibrate":
     """
-    Calibrates the model hyperparameters on the game data stored in the database.
+    Calibrates the model hyperparameters on historical NFL data.
     Argument --steps STEPS can be used to manually specify the number of
     training iterations (default is 100 steps).
 
@@ -150,66 +104,6 @@ elif subparser == "calibrate":
     steps = kwargs["steps"]
     for mode in ["spread", "total"]:
         model.EloraNFL.from_cache(mode, steps=steps, calibrate=True)
-
-elif subparser == "forecast":
-    """
-    Forecast games outcomes for a specific (season, week) combination.
-    Default behavior is to forecast the upcoming week.
-
-    Will throw an error if the schedule for the upcoming week has not been
-    released.
-
-    """
-    import nflgame
-    from nflmodel import model
-    import pandas as pd
-
-    season = kwargs["season"]
-    week = kwargs["week"]
-
-    try:
-        games = nflgame.games(season, week=week)
-    except TypeError:
-        sys.exit("cannot find schedule for season {} week {}"\
-                 .format(season, week))
-
-    logging.info("Forecast for season {} week {}\n".format(season, week))
-
-    def date(game):
-        return '-'.join([game.eid[:4], game.eid[4:6], game.eid[6:8]])
-
-    games = pd.DataFrame(
-        [(date(g), g.away, g.home) for g in games],
-        columns=["date", "away", "home"]
-    )
-
-    spreads = model.EloraNFL.from_cache("spread", calibrate=False)
-    totals = model.EloraNFL.from_cache("total", calibrate=False)
-
-    report = pd.DataFrame({
-        "date": games.date,
-        "favorite": games.away,
-        "underdog": "@" + games.home,
-        "win prob": spreads.sf(0, games.date, games.away, games.home),
-        "spread": spreads.mean(games.date, games.away, games.home),
-        "total": totals.mean(games.date, games.away, games.home),
-    }).set_index("date")
-
-    report[["favorite", "underdog"]] = report[["underdog", "favorite"]].where(
-        report["win prob"] < 0.5, report[["favorite", "underdog"]].values)
-
-    report["spread"] = report["spread"].where(
-        report["win prob"] < 0.5, -report["spread"].values)
-
-    report["one minus win prob"] = 1 - report["win prob"]
-    report["win prob"] = report[["win prob", "one minus win prob"]].max(axis=1)
-    report.drop(columns="one minus win prob", inplace=True)
-
-    report.sort_values("spread", inplace=True)
-
-    print(report.round({"win prob": 2, "spread": 1, "total": 1}), "\n")
-
-    print("*win probability and spread are for the favored team")
 
 elif subparser == "predict":
     """
@@ -240,8 +134,7 @@ elif subparser == "predict":
     total = totals.mean(datetime, away, home)
 
     away_score, home_score = (
-        0.5*(total - spread_away), 0.5*(total + spread_away)
-    )
+        0.5*(total - spread_away), 0.5*(total + spread_away))
 
     report = pd.DataFrame({
         "away": [
@@ -249,18 +142,21 @@ elif subparser == "predict":
             "{:.0f}%".format(100*win_prob_away),
             "{:.1f}".format(spread_away),
             "{:.1f}".format(total),
-            "{:.0f}".format(round(away_score)),
-        ],
+            "{:.0f}".format(round(away_score))],
         "home": [
             home,
             "{:.0f}%".format(100*win_prob_home),
             "{:.1f}".format(spread_home),
             "{:.1f}".format(total),
-            "{:.0f}".format(round(home_score)),
-        ],
-    })
+            "{:.0f}".format(round(home_score))]})
 
-    row_labels = {0: "team", 1: "win prob", 2: "spread", 3: "total", 4: "score"}
+    row_labels = {
+        0: "team",
+        1: "win prob",
+        2: "spread",
+        3: "total",
+        4: "score"}
+
     report.rename(index=row_labels, inplace=True)
 
     if spread_args is not None:
@@ -280,18 +176,15 @@ elif subparser == "predict":
 
         away_report = [
             "{:.0f}%".format(100*away_cover_prob),
-            "{:.0f}%".format(100*away_return_rate),
-        ]
+            "{:.0f}%".format(100*away_return_rate)]
 
         home_report = [
             "{:.0f}%".format(100*home_cover_prob),
-            "{:.0f}%".format(100*home_return_rate),
-        ]
+            "{:.0f}%".format(100*home_return_rate)]
 
         spread_report = pd.DataFrame({
             "away": away_report,
-            "home": home_report,
-        })
+            "home": home_report})
 
         row_labels = {0: "spread cover", 1: "spread return"}
         spread_report.rename(index=row_labels, inplace=True)
@@ -317,20 +210,17 @@ elif subparser == "predict":
             "",
             "over",
             "{:.0f}%".format(100*over_cover_prob),
-            "{:.0f}%".format(100*over_return_rate),
-        ]
+            "{:.0f}%".format(100*over_return_rate)]
 
         under_bet = [
             "",
             "under",
             "{:.0f}%".format(100*under_cover_prob),
-            "{:.0f}%".format(100*under_return_rate),
-        ]
+            "{:.0f}%".format(100*under_return_rate)]
 
         total_report = pd.DataFrame({
             "away": over_bet,
-            "home": under_bet,
-        })
+            "home": under_bet})
 
         row_labels = {0: "", 1: "", 2: "total cover", 3: "total return"}
         total_report.rename(index=row_labels, inplace=True)
@@ -358,15 +248,14 @@ elif subparser == "rank":
 
     df = pd.DataFrame(
         spreads.rank(datetime, order_by="win prob", reverse=True),
-        columns=["team", "win prob"],
-    )
+        columns=["team", "win prob"])
 
     df["win prob"] = df[["win prob"]].applymap("{:.2f}".format)
     col1 = df["team"] + "  " + df["win prob"]
 
     df = pd.DataFrame(
         spreads.rank(datetime, order_by="mean", reverse=True),
-        columns=["team", "point spread"],
+        columns=["team", "point spread"]
     ).round(decimals=1)
 
     df["point spread"] = df[["point spread"]].applymap("{:4.1f}".format)
