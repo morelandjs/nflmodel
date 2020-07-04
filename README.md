@@ -3,129 +3,99 @@ NFL Model
 
 *NFL ratings and predictions*
 
-This package trains the [margin-dependent Elo model (MELO)](https://github.com/morelandjs/melo) on NFL game data.
-
-Credit and thanks to Andrew Gallant for writing the [nflgame](https://github.com/BurntSushi/nflgame) Python package used to source NFL game data for this project.
+This package trains the [Elo regressor algorithm (elora)](https://github.com/morelandjs/elora) to predict NFL point spread and point total outcomes.
 
 Installation
 ------------
 
 ```
-git clone https://github.com/morelandjs/nfl-model.git && cd nfl-model
+git clone https://github.com/morelandjs/nflmodel.git && cd nflmodel
 pip install .
 ```
 
 Quick Start
 -----------
-First, populate the database
-```
-> nflmodel update
-```
-Then train the model on the dataset (this will take a few minutes)
+First train the model on historical game data (this will take a minute or two)
 ```
 > nflmodel calibrate --steps 100
 ```
-Once trained, the model can forecast point spread and point total statistics for the upcoming week
+Once trained, the model can generate point spread and point total predictions for arbitrary matchups in the future.
 ```
-> nflmodel forecast 2019 17
-[INFO][nflmodel] Forecast for season 2019 week 17
+> nflmodel predict 2019-12-08 CLE BAL --spread -110 -115 -12 --total -110 -110 45
 
-           favorite underdog  win prob  spread  total
-date                                                 
-2019-12-29      @NE      MIA      0.90   -17.1   43.3
-2019-12-29      @LA      ARI      0.70   -13.1   46.8
-2019-12-29     @DEN      OAK      0.73   -11.0   42.4
-2019-12-29     @BUF      NYJ      0.72   -10.8   40.4
-2019-12-29     @DAL      WAS      0.75    -9.3   46.9
-2019-12-29     @MIN      CHI      0.69    -9.1   34.5
-2019-12-29     @BAL      PIT      0.88    -9.1   42.9
-2019-12-29       NO     @CAR      0.78    -8.2   53.9
-2019-12-29       GB     @DET      0.83    -7.7   44.2
-2019-12-29      @KC      LAC      0.89    -7.3   43.9
-2019-12-29      PHI     @NYG      0.66    -5.9   49.1
-2019-12-29      CLE     @CIN      0.65    -4.0   45.2
-2019-12-29     @HOU      TEN      0.74    -3.4   47.7
-2019-12-29     @JAX      IND      0.54    -2.0   43.7
-2019-12-29      @TB      ATL      0.52    -1.4   51.4
-2019-12-29     @SEA       SF      0.51    -0.6   50.8 
+[INFO][nflmodel] 2019-12-08 CLE at BAL
 
-*win probability and spread are for the favored team
+               away   home
+team            CLE    BAL
+win prob        15%    85%
+spread         13.8  -13.8
+total          45.0   45.0
+score            16     29
+spread cover    45%    55%
+spread return  -16%     4%
+
+               over  under
+total cover     50%    50%
+total return    -5%    -5%
+
+*actual return rate lower than predicted
 ```
-The model can also rank teams by their expected performance against a league average opponent
+as well as rank teams at a certain moment in time by their expected performance against a league average opponent
 ```
-> nflmodel rank
-[INFO][nflmodel] Rankings as of 2020-01-09T21:09:54
+> nflmodel rank --datetime 2020-01-09
+
+[INFO][nflmodel] Rankings as of 2020-01-09
 
        win prob        spread         total
-rank                                       
-1      SF  0.78  │   NO  -8.1  │   TB  50.4
-2      NO  0.78  │   KC  -8.0  │  MIA  48.6
-3      KC  0.77  │  BAL  -7.4  │  NYG  48.3
-4      GB  0.75  │   NE  -7.1  │  CAR  48.3
-5     BAL  0.75  │   SF  -6.3  │   KC  48.2
-6      NE  0.68  │  DAL  -4.9  │   NO  47.9
-7     SEA  0.65  │   LA  -4.5  │   SF  47.4
-8      LA  0.63  │   GB  -3.6  │  BAL  47.3
-9     TEN  0.62  │  TEN  -3.0  │  ARI  47.2
-10    ATL  0.62  │  PHI  -2.9  │  SEA  47.0
-11    HOU  0.61  │  MIN  -2.9  │   LA  46.6
-12    PHI  0.61  │  ATL  -2.6  │  ATL  46.4
-13    DEN  0.61  │  SEA  -1.7  │  DET  46.2
-14    CHI  0.57  │  HOU  -1.3  │  DAL  46.2
-15    MIN  0.55  │  DEN  -1.1  │  HOU  46.2
-16    PIT  0.55  │  PIT  -0.9  │  CLE  46.1
-17    NYJ  0.52  │  CHI  -0.6  │  IND  45.9
-18    DAL  0.52  │   TB  -0.4  │  TEN  45.8
-19    BUF  0.48  │  BUF  -0.2  │  PHI  45.6
-20    JAX  0.47  │  LAC   0.5  │  CIN  45.3
-21     TB  0.47  │  IND   1.5  │  OAK  45.1
-22    ARI  0.44  │  ARI   1.6  │  WAS  45.0
-23    MIA  0.42  │  JAX   2.1  │  MIN  44.6
-24    OAK  0.41  │  NYJ   2.1  │  LAC  44.4
-25    IND  0.40  │  CLE   2.6  │   GB  44.4
-26    CLE  0.39  │  DET   3.0  │  JAX  44.1
-27    CAR  0.38  │  CAR   3.9  │  NYJ  43.5
-28    LAC  0.34  │  CIN   4.0  │   NE  43.2
-29    NYG  0.33  │  NYG   4.4  │  DEN  41.9
-30    DET  0.30  │  MIA   5.0  │  PIT  41.8
-31    CIN  0.30  │  OAK   5.5  │  BUF  41.1
-32    WAS  0.28  │  WAS   5.5  │  CHI  40.4 
+rank
+1     BAL  0.80  │  BAL  11.4  │   TB  49.7
+2      KC  0.72  │   KC   8.1  │   KC  48.4
+3      NO  0.68  │   NO   6.4  │   NO  48.3
+4      NE  0.67  │   NE   5.8  │  MIA  47.2
+5      SF  0.65  │   SF   5.4  │  NYG  46.6
+6     MIN  0.64  │  MIN   5.0  │   LA  46.6
+7     DAL  0.63  │  DAL   4.5  │   SF  46.5
+8     TEN  0.62  │  TEN   4.2  │  CAR  46.5
+9      GB  0.57  │   GB   2.4  │  ATL  46.5
+10     LA  0.57  │   LA   2.4  │  BAL  45.6
+11    SEA  0.54  │  SEA   1.4  │  SEA  45.5
+12    PHI  0.53  │  PHI   1.1  │  ARI  45.1
+13    BUF  0.53  │  BUF   1.1  │  DET  45.1
+14    ATL  0.53  │  ATL   1.0  │  HOU  45.0
+15    HOU  0.51  │  HOU   0.4  │  IND  45.0
+16    CH  0.51  │  CHI   0.4  │  OAK  44.8
+17     TB  0.51  │   TB   0.2  │   GB  44.7
+18    LAC  0.50  │  LAC  -0.1  │  DAL  44.6
+19    PIT  0.49  │  PIT  -0.3  │  CLE  44.6
+20    IND  0.48  │  IND  -0.7  │  CIN  44.3
+21    DEN  0.46  │  DEN  -1.2  │  PHI  44.1
+22    CLE  0.41  │  CLE  -3.0  │  LAC  43.9
+23    ARI  0.40  │  ARI  -3.5  │  WAS  43.6
+24    NYJ  0.39  │  NYJ  -3.9  │  TEN  43.5
+25    DET  0.39  │  DET  -3.9  │   NE  43.1
+26    JAX  0.35  │  JAX  -5.2  │  MIN  43.1
+27    NYG  0.35  │  NYG  -5.4  │  NYJ  42.8
+28    OAK  0.33  │  OAK  -5.8  │  PIT  41.9
+29    CIN  0.33  │  CIN  -6.1  │  JAX  41.8
+30    CAR  0.31  │  CAR  -6.8  │  DEN  40.2
+31    MIA  0.30  │  MIA  -7.3  │  BUF  39.8
+32    WAS  0.28  │  WAS  -7.9  │  CHI  39.5
 
 *expected performance against league average
 opponent on a neutral field
 ```
-And it can generate point spread and point total predictions for arbitrary matchups in the future...
-```
-> nflmodel predict 2019-12-08 CLE BAL --spread -110 -115 -12 --total -110 -110 45                 
-[INFO][nflmodel] 2019-12-08T00:00:00 CLE at BAL
 
-               away   home
-team            CLE    BAL
-win prob        12%    88%
-spread         13.7  -13.7
-total          47.4   47.4
-score            17     31
-spread cover    45%    55%
-spread return  -15%     3%
-                          
-               over  under
-total cover     56%    44%
-total return     9%   -19% 
-
-*actual return rate lower than predicted
-```
-
-Additionally, you can validate the model predictions by calling
+Additionally, the package can back test and validate its own predictions. The command
 ```
 > nflmodel validate
-[INFO][validate] spread residual mean: 0.09
-[INFO][validate] spread residual mean absolute error: 10.38
-[INFO][validate] total residual mean: 0.17
-[INFO][validate] total residual mean absolute error: 10.69
-nflmodel validate  11.68s user 0.10s system 98% cpu 11.996 total
+[INFO][validate] spread residual mean: 0.04
+[INFO][validate] spread residual mean absolute error: 10.64
+[INFO][validate] total residual mean: 0.04
+[INFO][validate] total residual mean absolute error: 10.81
 ```
-which generates two figures, `validate_spread.pdf` and `validate_total.pdf`, visualizing the distribution of prediction residuals and quantiles.
+generates two figures, `validate_spread.pdf` and `validate_total.pdf`, that visualize
+the distribution of prediction residuals and quantiles.
 
-For example, the model's point spread residuals are perfectly normal and its quantiles sample a uniform normal distribution.
+Quick inspection shows the model's point spread residuals are perfectly normal and its quantiles sample a uniform normal distribution as desired.
 
 ![point spread validation](tutorial/validate_spread.png "MELO point spreads and totals")

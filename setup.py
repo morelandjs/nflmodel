@@ -9,12 +9,11 @@ setup(
     packages=['nflmodel'],
     scripts=['scripts/nflmodel'],
     install_requires=[
+        'elora @ git+https://github.com/morelandjs/elora.git@master#egg=elora',
         'hyperopt',
         'matplotlib',
-        'melo @ git+https://github.com/morelandjs/elora.git@master#egg=elora'
         'numpy',
         'pandas',
         'scipy >= 0.18.0',
-        'setuptools',
-    ]
+        'setuptools']
 )

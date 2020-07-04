@@ -1,4 +1,4 @@
-"""Trains model and exposes predictor class objects"""
+"""Trains team model and exposes predictor class objects"""
 from functools import partial
 import logging
 import operator
@@ -9,18 +9,17 @@ from elora import Elora
 from hyperopt import fmin, hp, tpe, Trials
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
 from . import cachedir
 
 
-class EloraNFL(Elora):
+class EloraTeam(Elora):
     """
-    Generate NFL point-spread or point-total predictions
+    Generate NFL team point-spread or point-total predictions
     using the Elo regressor algorithm (elora)
 
     """
-    def __init__(self, mode, kfactor, regress_frac, scale=13, burnin=512):
+    def __init__(self, mode, kfactor, regress_frac, scale=1, burnin=512):
 
         # hyperparameters
         self.mode = mode
@@ -41,7 +40,7 @@ class EloraNFL(Elora):
         }[mode]
 
         # pre-process training data
-        self.games = self.format_gamedata(game_data.dataframe)
+        self.games = game_data.dataframe
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
 
         # train the model
@@ -53,19 +52,18 @@ class EloraNFL(Elora):
         self.rms_error = np.sqrt(np.mean(self.residuals_[burnin:]**2))
 
         # components for binary cross entropy loss
-        #y = self.examples.value > self.mean_value
-        #tiny = 1e-5
-        #yp = np.clip(
-        #    self.sf(
-        #        self.mean_value,
-        #        self.examples.time,
-        #        self.examples.label1,
-        #        self.examples.label2,
-        #        self.examples.bias),
-        #    tiny, 1 - tiny)
+        tiny = 1e-5
+        yp = np.clip(
+            self.pdf(
+                self.examples.value,
+                self.examples.time,
+                self.examples.label1,
+                self.examples.label2,
+                self.examples.bias),
+            tiny, 1 - tiny)
 
         # binary cross entropy loss
-        #self.log_loss = -np.mean(y*np.log(yp) + (1 - y)*np.log(1 - yp))
+        self.log_loss = -np.log(yp).mean()
 
     def regression_coeff(self, elapsed_time):
         """
@@ -80,76 +78,12 @@ class EloraNFL(Elora):
 
         return self.regress_frac if elapsed_months > 90 else 1
 
-    def format_gamedata(self, games):
-        """
-        Preprocesses raw game data, returning a model input table.
-
-        This function calculates some new columns and adds them to the
-        games table:
-
-                column  description
-                  home  home team name joined to home quarterback name
-                  away  away team name joined to away quarterback name
-        rest_days_home  home team days rested
-        rest_days_away  away team days rested
-              exp_home  games played by the home quarterback
-              exp_away  games played by the away quarterback
-
-        """
-        # sort games by date
-        games = games.sort_values(by=["date", "team_home"])
-
-        # give jacksonville jaguars a single name
-        games.replace("JAC", "JAX", inplace=True)
-
-        # give teams which haved moved cities their current name
-        games.replace("SD", "LAC", inplace=True)
-        games.replace("STL", "LA", inplace=True)
-
-        # game dates for every team
-        game_dates = pd.concat([
-            games[["date", "team_home"]].rename(
-                columns={"team_home": "team"}),
-            games[["date", "team_away"]].rename(
-                columns={"team_away": "team"}),
-        ]).sort_values("date")
-
-        # game dates for every team
-        game_dates = pd.concat([
-            games[["date", "team_home"]].rename(
-                columns={"team_home": "team"}),
-            games[["date", "team_away"]].rename(
-                columns={"team_away": "team"}),
-        ]).sort_values("date")
-
-        # compute days rested
-        for team in ["home", "away"]:
-            games_prev = game_dates.rename(
-                columns={"team": "team_{}".format(team)})
-
-            games_prev["date_{}_prev".format(team)] = games.date
-
-            games = pd.merge_asof(
-                games, games_prev,
-                on="date", by="team_{}".format(team),
-                allow_exact_matches=False
-            )
-
-        # days rested since last game
-        one_day = pd.Timedelta("1 days")
-        games["rest_days_home"] = np.clip(
-            (games.date - games.date_home_prev) / one_day, 3, 16).fillna(7)
-        games["rest_days_away"] = np.clip(
-            (games.date - games.date_away_prev) / one_day, 3, 16).fillna(7)
-
-        return games
-
     def train(self):
         """
         Trains the Margin Elo (MELO) model on the historical game data.
 
         """
-        super(EloraNFL, self).__init__(
+        super(EloraTeam, self).__init__(
             self.kfactor,
             scale=self.scale,
             commutes=self.commutes)
@@ -162,18 +96,20 @@ class EloraNFL(Elora):
                 self.games.tm_pts_away,
                 self.games.tm_pts_home))
 
-    def visualize_hyperopt(mode, trials, parameters):
+    def visualize_hyperopt(mode, trials, parameters, measure, filename):
         """
         Visualize hyperopt loss minimization.
 
         """
         plotdir = cachedir / "plots"
+        nparam = len(parameters)
 
         if not plotdir.exists():
             plotdir.mkdir()
 
         fig, axes = plt.subplots(
-            ncols=2, figsize=(12, 3), sharey=True)
+            ncols=nparam, figsize=(4*nparam, 3), sharey=True)
+        axes = np.array(axes, ndmin=1)
 
         losses = trials.losses()
 
@@ -185,9 +121,9 @@ class EloraNFL(Elora):
             ax.set_xlim(min(vals), max(vals))
 
             if ax.is_first_col():
-                ax.set_ylabel("Mean absolute error")
+                ax.set_ylabel(measure)
 
-        plotfile = plotdir / "{}_params.pdf".format(mode)
+        plotfile = plotdir / filename
         plt.tight_layout()
         plt.savefig(str(plotfile))
 
@@ -224,7 +160,7 @@ class EloraNFL(Elora):
     @classmethod
     def from_cache(cls, mode, steps=100, calibrate=False):
         """
-        Optimizes the EloraNFL model hyper parameters. Returns cached values
+        Optimizes the EloraTeam model hyper parameters. Returns cached values
         if calibrate is False and the parameters are cached, otherwise it
         optimizes the parameters and saves them to the cache.
 
@@ -234,14 +170,10 @@ class EloraNFL(Elora):
         if not calibrate and cachefile.exists():
             return pickle.load(cachefile.open(mode="rb"))
 
-        def evaluation_function(params):
-            return cls(mode, *params).mean_abs_error
-
         limits = {
             "spread": [
                 ("kfactor",     0.02, 0.12),
-                ("regress_frac", 0.0,  1.0),
-            ],
+                ("regress_frac", 0.0,  1.0)],
             "total": [
                 ("kfactor",      0.01, 0.07),
                 ("regress_frac",  0.0, 1.0)]}
@@ -250,15 +182,49 @@ class EloraNFL(Elora):
 
         trials = Trials()
 
-        logging.info("calibrating {} hyperparameters".format(mode))
+        logging.info("calibrating {} kfactor and regress_frac "
+                     "hyperparameters".format(mode))
 
-        parameters = fmin(evaluation_function, space, algo=tpe.suggest,
-                          max_evals=steps, trials=trials,
-                          show_progressbar=False)
+        def calibrate_loc_params(params):
+            return cls(mode, *params).mean_abs_error
 
-        model = cls(mode, **parameters)
+        parameters = fmin(
+            calibrate_loc_params, space, algo=tpe.suggest,
+            max_evals=steps, trials=trials, show_progressbar=False)
 
-        cls.visualize_hyperopt(mode, trials, parameters)
+        kfactor = parameters['kfactor']
+        regress_frac = parameters['regress_frac']
+
+        cls.visualize_hyperopt(
+            mode, trials, parameters,
+            'Mean absolute error', f'{mode}_loc_params.pdf')
+
+        limits = {
+            "spread": [
+                ("scale", 5., 25.)],
+            "total": [
+                ("scale", 5., 25.)]}
+
+        space = [hp.uniform(*lim) for lim in limits[mode]]
+
+        trials = Trials()
+
+        logging.info("calibrating {} scale hyperparameter".format(mode))
+
+        def calibrate_scale_param(params):
+            return cls(mode, kfactor, regress_frac, scale=params[0]).log_loss
+
+        parameters = fmin(
+            calibrate_scale_param, space, algo=tpe.suggest,
+            max_evals=steps, trials=trials, show_progressbar=False)
+
+        scale = parameters['scale']
+
+        cls.visualize_hyperopt(
+            mode, trials, parameters,
+            'Log loss', f'{mode}_scale_params.pdf')
+
+        model = cls(mode, kfactor, regress_frac, scale=scale)
 
         cachefile.parent.mkdir(exist_ok=True)
 
@@ -271,7 +237,7 @@ class EloraNFL(Elora):
 
 if __name__ == '__main__':
 
-    spreads = EloraNFL.from_cache('spread', calibrate=False)
+    spreads = EloraTeam.from_cache('spread', calibrate=False)
     games = spreads.games
 
     spread_pred = spreads.mean(games.date, games.team_away, games.team_home)
