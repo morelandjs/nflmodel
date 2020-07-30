@@ -9,6 +9,7 @@ from elora import Elora
 from hyperopt import fmin, hp, tpe, Trials
 import matplotlib.pyplot as plt
 import numpy as np
+from qbmodel.model import EloraQB
 
 from . import cachedir
 
@@ -19,12 +20,14 @@ class EloraTeam(Elora):
     using the Elo regressor algorithm (elora)
 
     """
-    def __init__(self, mode, kfactor, regress_frac, scale=1, burnin=512):
+    def __init__(self, mode, kfactor, regress_frac, rest_coeff,
+                 scale=1, burnin=512):
 
         # hyperparameters
         self.mode = mode
         self.kfactor = kfactor
         self.regress_frac = regress_frac
+        self.rest_coeff = rest_coeff
         self.scale = scale
         self.burnin = burnin
 
@@ -40,7 +43,8 @@ class EloraTeam(Elora):
         }[mode]
 
         # pre-process training data
-        self.games = game_data.dataframe
+        self.games = game_data.dataframe.sort_values(
+            by=['date', 'team_away', 'team_home'])
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
 
         # train the model
@@ -74,9 +78,35 @@ class EloraTeam(Elora):
             self.regress_frac if elapsed_days > 90, else 1
 
         """
-        elapsed_months = elapsed_time / np.timedelta64(1, 'D')
+        elapsed_days = elapsed_time / np.timedelta64(1, 'D')
 
-        return self.regress_frac if elapsed_months > 90 else 1
+        tiny= 1e-6
+        arg = np.clip(self.regress_frac, tiny, 1 - tiny)
+        factor = np.log(self.regress_frac)/365.
+
+        return np.exp(factor * elapsed_days)
+
+    def bias(self, games):
+        """
+        Circumstantial bias factors which apply to a single game.
+
+        """
+        rest_adv = self.rest_coeff * self.compare(
+            games.tm_rest_days_away, games.tm_rest_days_home)
+
+        # TODO finish this!
+
+        #qb_model = EloraQB.from_cache(self.mode)
+
+        #qb_pts = qb_model.mean(
+        #    games.date, games.qb_away, games.qb_home)
+
+        #qb_prev_pts = qb_model.mean(
+        #    games.date, games.qb_prev_away, games.qb_prev_home)
+
+        #qb_chg_bias = self.qb_chg_adj * (qb_pts - qb_prev_pts)
+
+        return rest_adv #+ qb_chg_bias
 
     def train(self):
         """
@@ -88,13 +118,22 @@ class EloraTeam(Elora):
             scale=self.scale,
             commutes=self.commutes)
 
+        values = self.compare(
+                self.games.tm_pts_away,
+                self.games.tm_pts_home)
+        #plt.hist(values, bins=np.arange(-40.5, 41.5))
+        #plt.show()
+        #quit()
+
         self.fit(
             self.games.date,
             self.games.team_away,
             self.games.team_home,
             self.compare(
                 self.games.tm_pts_away,
-                self.games.tm_pts_home))
+                self.games.tm_pts_home),
+            biases=self.bias(self.games)
+        )
 
     def visualize_hyperopt(mode, trials, parameters, measure, filename):
         """
@@ -109,6 +148,7 @@ class EloraTeam(Elora):
 
         fig, axes = plt.subplots(
             ncols=nparam, figsize=(4*nparam, 3), sharey=True)
+
         axes = np.array(axes, ndmin=1)
 
         losses = trials.losses()
@@ -173,10 +213,12 @@ class EloraTeam(Elora):
         limits = {
             "spread": [
                 ("kfactor",     0.02, 0.12),
-                ("regress_frac", 0.0,  1.0)],
+                ("regress_frac", 0.0,  1.0),
+                ("rest_coeff", -0.50, 0.75)],
             "total": [
                 ("kfactor",      0.01, 0.07),
-                ("regress_frac",  0.0, 1.0)]}
+                ("regress_frac",  0.0,  1.0),
+                ("rest_coeff",   -0.5,  0.5)]}
 
         space = [hp.uniform(*lim) for lim in limits[mode]]
 
@@ -194,6 +236,7 @@ class EloraTeam(Elora):
 
         kfactor = parameters['kfactor']
         regress_frac = parameters['regress_frac']
+        rest_coeff = parameters['rest_coeff']
 
         cls.visualize_hyperopt(
             mode, trials, parameters,
@@ -212,7 +255,9 @@ class EloraTeam(Elora):
         logging.info("calibrating {} scale hyperparameter".format(mode))
 
         def calibrate_scale_param(params):
-            return cls(mode, kfactor, regress_frac, scale=params[0]).log_loss
+            return cls(
+                mode, kfactor, regress_frac, rest_coeff,
+                scale=params[0]).log_loss
 
         parameters = fmin(
             calibrate_scale_param, space, algo=tpe.suggest,
@@ -224,7 +269,9 @@ class EloraTeam(Elora):
             mode, trials, parameters,
             'Log loss', f'{mode}_scale_params.pdf')
 
-        model = cls(mode, kfactor, regress_frac, scale=scale)
+        model = cls(
+            mode, kfactor, regress_frac, rest_coeff,
+            scale=scale)
 
         cachefile.parent.mkdir(exist_ok=True)
 

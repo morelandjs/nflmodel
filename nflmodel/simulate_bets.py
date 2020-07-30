@@ -29,8 +29,9 @@ def bet_spread(mode, burnin=512, threshold=0.55, odds=110):
     bet_home = home_cover_prob > threshold
     bet_away = away_cover_prob > threshold
 
-    cover_home = games.spread_outcome - games.spread_vegas > 0
-    cover_away = games.spread_outcome - games.spread_vegas < 0
+    home_spread = games.tm_pts_home - games.tm_pts_away
+    cover_home = home_spread - games.spread_vegas > 0
+    cover_away = home_spread - games.spread_vegas < 0
 
     home_correct = cover_home[bet_home].sum()
     home_incorrect = cover_away[bet_home].sum()
