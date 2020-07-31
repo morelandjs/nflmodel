@@ -6,13 +6,13 @@ import operator
 import os
 import pickle
 
+from armchair_analysis.game_data import game_data
 from hyperopt import fmin, hp, tpe, Trials
 import matplotlib.pyplot as plt
 from melo import Melo
 import numpy as np
 import pandas as pd
 
-from .data import load_games, update_model
 from . import cachedir
 
 
@@ -46,7 +46,7 @@ class MeloNFL(Melo):
         }[mode]
 
         # pre-process training data
-        self.games = self.format_gamedata(load_games(update=False))
+        self.games = self.format_gamedata(game_data.dataframe)
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
         self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
 
@@ -76,8 +76,8 @@ class MeloNFL(Melo):
         experience of each quarterback.
 
         """
-        rest_level_away = 1 - np.exp(-games.rest_days_away / 5.)
-        rest_level_home = 1 - np.exp(-games.rest_days_home / 5.)
+        rest_level_away = 1 - np.exp(-games.tm_rest_days_away / 5.)
+        rest_level_home = 1 - np.exp(-games.tm_rest_days_home / 5.)
 
         rest_bias = self.rest_bonus * self.compare(
             rest_level_away,
@@ -118,7 +118,7 @@ class MeloNFL(Melo):
 
         """
         # sort games by date
-        games = games.sort_values(by=["datetime", "team_home"])
+        games = games.sort_values(by=["date", "team_home"])
 
         # give jacksonville jaguars a single name
         games.replace("JAC", "JAX", inplace=True)
@@ -129,11 +129,11 @@ class MeloNFL(Melo):
 
         # game dates for every team
         game_dates = pd.concat([
-            games[["datetime", "team_home"]].rename(
+            games[["date", "team_home"]].rename(
                 columns={"team_home": "team"}),
-            games[["datetime", "team_away"]].rename(
+            games[["date", "team_away"]].rename(
                 columns={"team_away": "team"}),
-        ]).sort_values("datetime")
+        ]).sort_values("date")
 
         # create home and away label columns
         games["home"] = games["team_home"] + '-' + games["qb_home"]
@@ -141,31 +141,31 @@ class MeloNFL(Melo):
 
         # game dates for every team
         game_dates = pd.concat([
-            games[["datetime", "team_home"]].rename(
+            games[["date", "team_home"]].rename(
                 columns={"team_home": "team"}),
-            games[["datetime", "team_away"]].rename(
+            games[["date", "team_away"]].rename(
                 columns={"team_away": "team"}),
-        ]).sort_values("datetime")
+        ]).sort_values("date")
 
         # compute days rested
         for team in ["home", "away"]:
             games_prev = game_dates.rename(
                 columns={"team": "team_{}".format(team)})
 
-            games_prev["date_{}_prev".format(team)] = games.datetime
+            games_prev["date_{}_prev".format(team)] = games.date
 
             games = pd.merge_asof(
                 games, games_prev,
-                on="datetime", by="team_{}".format(team),
+                on="date", by="team_{}".format(team),
                 allow_exact_matches=False
             )
 
         # days rested since last game
         one_day = pd.Timedelta("1 days")
         games["rest_days_home"] = \
-            (games.datetime - games.date_home_prev) / one_day
+            (games.date - games.date_home_prev) / one_day
         games["rest_days_away"] = \
-            (games.datetime - games.date_away_prev) / one_day
+            (games.date - games.date_away_prev) / one_day
 
         # set days rested to 7 at beginning of the season (default)
         games["rest_days_home"] = games["rest_days_home"].where(
@@ -174,12 +174,12 @@ class MeloNFL(Melo):
             games.week > 1, other=7)
 
         # games played by each qb
-        qb_home = games[["datetime", "qb_home"]].rename(
+        qb_home = games[["date", "qb_home"]].rename(
             columns={"qb_home": "qb"})
-        qb_away = games[["datetime", "qb_away"]].rename(
+        qb_away = games[["date", "qb_away"]].rename(
             columns={"qb_away": "qb"})
 
-        qb_exp = pd.concat([qb_home, qb_away]).sort_values("datetime")
+        qb_exp = pd.concat([qb_home, qb_away]).sort_values("date")
         qb_exp["exp"] = qb_exp.groupby("qb").cumcount()
 
         for team in ["home", "away"]:
@@ -187,7 +187,7 @@ class MeloNFL(Melo):
                 qb_exp.rename(columns={
                     "qb": "qb_{}".format(team),
                     "exp": "exp_{}".format(team)
-                }), on=["datetime", "qb_{}".format(team)],
+                }), on=["date", "qb_{}".format(team)],
             )
 
         return games
@@ -205,12 +205,12 @@ class MeloNFL(Melo):
 
         # train the model
         self.fit(
-            self.games.datetime,
-            self.games.away,
-            self.games.home,
+            self.games.date,
+            self.games.team_away,
+            self.games.team_home,
             self.compare(
-                self.games.score_away,
-                self.games.score_home,
+                self.games.tm_pts_away,
+                self.games.tm_pts_home,
             ),
             self.bias(self.games)
         )
@@ -268,14 +268,12 @@ class MeloNFL(Melo):
 
             model = pickle.load(cachefile.open(mode="rb"))
 
-            if update_model(cache_timestamp):
-                logging.info("updating model")
-                load_games(update=True)
-                model.train()
+            logging.info("updating model")
+            model.train()
 
-                logging.info("caching {} model to {}".format(mode, cachefile))
-                pickle.dump(model, cachefile.open(mode="wb"),
-                            protocol=pickle.HIGHEST_PROTOCOL)
+            logging.info("caching {} model to {}".format(mode, cachefile))
+            pickle.dump(model, cachefile.open(mode="wb"),
+                        protocol=pickle.HIGHEST_PROTOCOL)
 
             return model
 
@@ -285,8 +283,8 @@ class MeloNFL(Melo):
         limits = {
             "spread": [
                 ("kfactor",       0.1,  0.4),
-                ("regress_coeff", 0.1,  0.5),
-                ("rest_bonus",    0.0,  0.5),
+                ("regress_coeff", 0.1,  0.7),
+                ("rest_bonus",    0.0,  0.7),
                 ("exp_bonus",     0.0,  0.5),
                 ("weight_qb",     0.0,  1.0),
             ],
@@ -304,8 +302,6 @@ class MeloNFL(Melo):
         trials = Trials()
 
         logging.info("calibrating {} hyperparameters".format(mode))
-
-        load_games(update=True)
 
         parameters = fmin(evaluation_function, space, algo=tpe.suggest,
                           max_evals=steps, trials=trials,

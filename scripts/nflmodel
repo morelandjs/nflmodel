@@ -5,10 +5,8 @@ from datetime import datetime
 import logging
 import sys
 
-from nflmodel import get_current_season_week
 
-
-current_season, current_week = get_current_season_week()
+current_season, current_week = 2020, 1
 
 now = datetime.now()
 
@@ -24,19 +22,12 @@ subparsers = parser.add_subparsers(
     required=True,
 )
 
-update_p = subparsers.add_parser("update")
 games_p = subparsers.add_parser("games")
 calibrate_p = subparsers.add_parser("calibrate")
 predict_p = subparsers.add_parser("predict")
 forecast_p = subparsers.add_parser("forecast")
 rank_p = subparsers.add_parser("rank")
 validate_p = subparsers.add_parser("validate")
-
-update_p.add_argument(
-    "--rebuild",
-    action="store_true",
-    help="rebuild game data from scratch",
-)
 
 games_p.add_argument(
     "--head",
@@ -120,30 +111,20 @@ args = parser.parse_args()
 kwargs = vars(args)
 subparser = kwargs.pop("subparser")
 
-if subparser == "update":
-    """
-    Refreshes the current games database. Optionally, provide flag
-    --rebuild to delete and rebuild the games database from scratch.
 
-    """
-    from nflmodel import data
-
-    rebuild = kwargs["rebuild"]
-    data.load_games(update=True, rebuild=rebuild)
-
-elif subparser == "games":
+if subparser == "games":
     """
     Prints a subset of the games database to standard out.
     Arguments --head and --tail can be used to increase the maximum number of
     rows printed.
 
     """
-    from nflmodel import data
+    from armchair_analysis.game_data import game_data
     import pandas as pd
 
     nhead = kwargs["head"]
     ntail = kwargs["tail"]
-    games = data.load_games(update=False)
+    games = game_data.dataframe
 
     if nhead == -1 and ntail == -1:
         print(games)
@@ -169,66 +150,6 @@ elif subparser == "calibrate":
     steps = kwargs["steps"]
     for mode in ["spread", "total"]:
         model.MeloNFL.from_cache(mode, steps=steps, calibrate=True)
-
-elif subparser == "forecast":
-    """
-    Forecast games outcomes for a specific (season, week) combination.
-    Default behavior is to forecast the upcoming week.
-
-    Will throw an error if the schedule for the upcoming week has not been
-    released.
-
-    """
-    import nflgame
-    from nflmodel import model
-    import pandas as pd
-
-    season = kwargs["season"]
-    week = kwargs["week"]
-
-    try:
-        games = nflgame.games(season, week=week)
-    except TypeError:
-        sys.exit("cannot find schedule for season {} week {}"\
-                 .format(season, week))
-
-    logging.info("Forecast for season {} week {}\n".format(season, week))
-
-    def date(game):
-        return '-'.join([game.eid[:4], game.eid[4:6], game.eid[6:8]])
-
-    games = pd.DataFrame(
-        [(date(g), g.away, g.home) for g in games],
-        columns=["date", "away", "home"]
-    )
-
-    spreads = model.MeloNFL.from_cache("spread", calibrate=False)
-    totals = model.MeloNFL.from_cache("total", calibrate=False)
-
-    report = pd.DataFrame({
-        "date": games.date,
-        "favorite": games.away,
-        "underdog": "@" + games.home,
-        "win prob": spreads.probability(games.date, games.away, games.home),
-        "spread": spreads.median(games.date, games.away, games.home),
-        "total": totals.median(games.date, games.away, games.home),
-    }).set_index("date")
-
-    report[["favorite", "underdog"]] = report[["underdog", "favorite"]].where(
-        report["win prob"] < 0.5, report[["favorite", "underdog"]].values)
-
-    report["spread"] = report["spread"].where(
-        report["win prob"] < 0.5, -report["spread"].values)
-
-    report["one minus win prob"] = 1 - report["win prob"]
-    report["win prob"] = report[["win prob", "one minus win prob"]].max(axis=1)
-    report.drop(columns="one minus win prob", inplace=True)
-
-    report.sort_values("spread", inplace=True)
-
-    print(report.round({"win prob": 2, "spread": 1, "total": 1}), "\n")
-
-    print("*win probability and spread are for the favored team")
 
 elif subparser == "predict":
     """
