@@ -9,14 +9,13 @@ setup(
     packages=['nflmodel'],
     scripts=['scripts/nflmodel'],
     install_requires=[
+        'armchair_analysis @ git+https://github.com/morelandjs/armchair_analysis.git@master#egg=armchair_analysis',
         'hyperopt',
         'matplotlib',
         'melo @ git+https://git@github.com/morelandjs/melo.git@dev#egg=melo',
-        'nflgame_redux @ git+https://git@github.com/morelandjs/nflgame.git@master#egg=nflgame_redux',
         'numpy',
         'pandas',
         'scipy >= 0.18.0',
         'setuptools',
-        'SQLAlchemy',
     ]
 )
