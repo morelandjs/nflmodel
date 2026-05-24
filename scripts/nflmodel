@@ -171,13 +171,13 @@ elif subparser == "predict":
     spreads = model.MeloNFL.from_cache("spread")
     totals = model.MeloNFL.from_cache("total")
 
-    win_prob_away = spreads.probability(datetime, away, home)
+    win_prob_away = float(spreads.probability(datetime, away, home))
     win_prob_home = 1 - win_prob_away
 
-    spread_home = spreads.median(datetime, away, home)
+    spread_home = float(spreads.median(datetime, away, home))
     spread_away = -spread_home
 
-    total = totals.median(datetime, away, home)
+    total = float(totals.median(datetime, away, home))
 
     away_score, home_score = (
         0.5*(total - spread_away), 0.5*(total + spread_away)
@@ -281,6 +281,62 @@ elif subparser == "predict":
 
     print("*actual return rate lower than predicted")
 
+elif subparser == "forecast":
+    """
+    Forecast point spread and point total for each game in the specified week.
+
+    """
+    from nflmodel import model
+    import pandas as pd
+
+    season = kwargs["season"]
+    week = kwargs["week"]
+
+    logging.info("Forecast for season {} week {}\n".format(season, week))
+
+    spreads = model.MeloNFL.from_cache("spread")
+    totals = model.MeloNFL.from_cache("total")
+
+    week_games = spreads.games[
+        (spreads.games.season == season) & (spreads.games.week == week)
+    ]
+
+    rows = []
+    for _, game in week_games.iterrows():
+        date = game.date
+        away = game.team_away
+        home = game.team_home
+
+        win_prob_away = float(spreads.probability(date, away, home))
+        win_prob_home = 1 - win_prob_away
+        median = float(spreads.median(date, away, home))
+        total = float(totals.median(date, away, home))
+
+        if win_prob_away >= win_prob_home:
+            favorite = away
+            underdog = "@" + home
+            win_prob = win_prob_away
+            spread = -median
+        else:
+            favorite = "@" + home
+            underdog = away
+            win_prob = win_prob_home
+            spread = median
+
+        rows.append({
+            "date": date.date(),
+            "favorite": favorite,
+            "underdog": underdog,
+            "win prob": round(win_prob, 2),
+            "spread": round(-abs(spread), 1),
+            "total": round(total, 1),
+        })
+
+    df = pd.DataFrame(rows).set_index("date")
+    df = df.sort_values("spread")
+    print(df.to_string())
+    print("\n*win probability and spread are for the favored team")
+
 elif subparser == "rank":
     """
     Rank NFL teams at a certain point in time. The rankings are based on all
@@ -301,7 +357,7 @@ elif subparser == "rank":
         columns=["team", "win prob"],
     )
 
-    df["win prob"] = df[["win prob"]].applymap("{:.2f}".format)
+    df["win prob"] = df[["win prob"]].map("{:.2f}".format)
     col1 = df["team"] + "  " + df["win prob"]
 
     df = pd.DataFrame(
@@ -311,7 +367,7 @@ elif subparser == "rank":
 
     df["point spread"] *= -1
 
-    df["point spread"] = df[["point spread"]].applymap("{:4.1f}".format)
+    df["point spread"] = df[["point spread"]].map("{:4.1f}".format)
     col2 = df["team"] + "  " + df["point spread"]
 
     df = pd.DataFrame(
@@ -319,7 +375,7 @@ elif subparser == "rank":
         columns=["team", "point total"],
     ).round(decimals=1)
 
-    df["point total"] = df[["point total"]].applymap("{:4.1f}".format)
+    df["point total"] = df[["point total"]].map("{:4.1f}".format)
     col3 = df["team"] + "  " + df["point total"]
 
     rankings = pd.concat([col1, col2, col3], axis=1)

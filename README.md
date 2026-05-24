@@ -17,11 +17,7 @@ pip install .
 
 Quick Start
 -----------
-First, populate the database
-```
-> nflmodel update
-```
-Then train the model on the dataset (this will take a few minutes)
+Train the model on the dataset (this will take a few minutes)
 ```
 > nflmodel calibrate --steps 100
 ```

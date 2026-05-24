@@ -12,7 +12,7 @@ setup(
         'armchair_analysis @ git+https://github.com/morelandjs/armchair_analysis.git@master#egg=armchair_analysis',
         'hyperopt',
         'matplotlib',
-        'melo @ git+https://git@github.com/morelandjs/melo.git@dev#egg=melo',
+        'melo >= 1.1.2',
         'numpy',
         'pandas',
         'scipy >= 0.18.0',

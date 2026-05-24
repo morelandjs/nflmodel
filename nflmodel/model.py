@@ -23,7 +23,7 @@ class MeloNFL(Melo):
 
     """
     def __init__(self, mode, kfactor, regress_coeff,
-                 rest_bonus, exp_bonus, weight_qb, burnin=512):
+                 rest_bonus, exp_bonus, burnin=512):
 
         # hyperparameters
         self.mode = mode
@@ -31,7 +31,6 @@ class MeloNFL(Melo):
         self.regress_coeff = regress_coeff
         self.rest_bonus = rest_bonus
         self.exp_bonus = exp_bonus
-        self.weight_qb = weight_qb
         self.burnin = burnin
 
         # model operation mode: "spread" or "total"
@@ -48,7 +47,6 @@ class MeloNFL(Melo):
         # pre-process training data
         self.games = self.format_gamedata(game_data.dataframe)
         self.teams = np.union1d(self.games.team_home, self.games.team_away)
-        self.qbs = np.union1d(self.games.qb_home, self.games.qb_away)
 
         # train the model
         self.train()
@@ -93,13 +91,6 @@ class MeloNFL(Melo):
         )
 
         return rest_bias + exp_bias
-
-    def combine(self, team_rating, qb_rating):
-        """
-        Combines team and quarterback ratings to form a single rating
-
-        """
-        return (1 - self.weight_qb)*team_rating + self.weight_qb*qb_rating
 
     def format_gamedata(self, games):
         """
@@ -201,7 +192,7 @@ class MeloNFL(Melo):
         super(MeloNFL, self).__init__(
             self.kfactor, lines=self.lines, sigma=1.0,
             regress=self.regress, regress_unit="month",
-            commutes=self.commutes, combine=self.combine)
+            commutes=self.commutes)
 
         # train the model
         self.fit(
@@ -226,18 +217,18 @@ class MeloNFL(Melo):
             plotdir.mkdir()
 
         fig, axes = plt.subplots(
-            ncols=5, figsize=(12, 3), sharey=True)
+            ncols=4, figsize=(12, 3), sharey=True)
 
         losses = trials.losses()
 
-        for ax, (label, vals) in zip(axes.flat, trials.vals.items()):
+        for i, (ax, (label, vals)) in enumerate(zip(axes.flat, trials.vals.items())):
             c = plt.cm.coolwarm(np.linspace(0, 1, len(vals)))
             ax.scatter(vals, losses, c=c)
             ax.axvline(parameters[label], color='k')
             ax.set_xlabel(label)
             ax.set_xlim(min(vals), max(vals))
 
-            if ax.is_first_col():
+            if i == 0:
                 ax.set_ylabel("Mean absolute error")
 
         plotfile = plotdir / "{}_params.pdf".format(mode)
@@ -249,8 +240,7 @@ class MeloNFL(Melo):
         Modify melo ranking function to only consider teams (ignore qbs).
 
         """
-        return super(MeloNFL, self).rank(
-            time, labels=self.teams, statistic=statistic)
+        return super(MeloNFL, self).rank(time, statistic=statistic)
 
     @classmethod
     def from_cache(cls, mode, steps=100, calibrate=False):
@@ -286,14 +276,12 @@ class MeloNFL(Melo):
                 ("regress_coeff", 0.1,  0.7),
                 ("rest_bonus",    0.0,  0.7),
                 ("exp_bonus",     0.0,  0.5),
-                ("weight_qb",     0.0,  1.0),
             ],
             "total": [
                 ("kfactor",       0.0, 0.3),
                 ("regress_coeff", 0.0, 0.5),
                 ("rest_bonus",   -0.5, 0.0),
                 ("exp_bonus",     0.1, 0.4),
-                ("weight_qb",     0.0, 1.0),
             ]
         }
 
